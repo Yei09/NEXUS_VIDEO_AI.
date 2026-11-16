@@ -243,22 +243,23 @@ def main():
   "[2:a]lowpass=f=500,highpass=f=65,volume=0.11[wind]",
   "[3:a]lowpass=f=115,volume=0.07[drone]"
  ]
- inputs=["-i",str(silent),"-i",str(narration),"-f","lavfi","-i",f"anoisesrc=color=pink:amplitude=0.035:sample_rate=44100:duration={total:.3f}","-f","lavfi","-i",f"sine=frequency=48:sample_rate=44100:duration={total:.3f}"]
+ inputs=["-i",str(silent),"-i",str(narration),"-f","lavfi","-i",f"anoisesrc=color=pink:amplitude=0.035:sample_rate=44100:duration={total:.3f}","-f","lavfi","-i",f"sine=frequency=48:sample_rate=44100:duration={total:.3f}","-f","lavfi","-i",f"sine=frequency=760:sample_rate=44100:duration={total:.3f}","-f","lavfi","-i",f"sine=frequency=65:sample_rate=44100:duration={total:.3f}","-f","lavfi","-i",f"anoisesrc=color=white:amplitude=0.12:sample_rate=44100:duration={total:.3f}"]
  # Sound effects are short synthesized tonal/noise events placed at their matching beat.
- cue_expr=[]
+ ring_expr=[]; knock_expr=[]; other_expr=[]
  starts=[]; cur=0
  for i,secs in enumerate(lengths_clip):
   starts.append(cur); cur+=secs
  for i,event in enumerate(story["events"]):
   t=starts[i]+min(0.35,lengths[i]*0.25)
   if event["sfx"] in ("ring","mobile"):
-   freq=760 if event["sfx"]=="ring" else 980
-   cue_expr.append(f"0.28*between(t,{t:.2f},{t+0.32:.2f})+0.28*between(t,{t+0.58:.2f},{t+0.90:.2f})")
+   ring_expr.append(f"0.24*between(t,{t:.2f},{t+0.32:.2f})+0.24*between(t,{t+0.58:.2f},{t+0.90:.2f})")
   elif event["sfx"]=="knocks":
-   cue_expr.append(f"0.35*between(t,{t:.2f},{t+0.10:.2f})+0.35*between(t,{t+0.22:.2f},{t+0.32:.2f})+0.35*between(t,{t+0.44:.2f},{t+0.54:.2f})")
-  else: cue_expr.append(f"0.18*between(t,{t:.2f},{t+0.24:.2f})")
- filters.append(f"[4:a]volume='{'+'.join(cue_expr)}',lowpass=f=260,afade=t=out:st={max(0,total-2):.2f}:d=2[cues]")
- filters.append("[voice][wind][drone][cues]amix=inputs=4:duration=first:weights='1 0.16 0.12 0.22',loudnorm=I=-16:TP=-1.5:LRA=10[a]")
+   knock_expr.append(f"0.55*between(t,{t:.2f},{t+0.10:.2f})+0.55*between(t,{t+0.22:.2f},{t+0.32:.2f})+0.55*between(t,{t+0.44:.2f},{t+0.54:.2f})")
+  else: other_expr.append(f"0.22*between(t,{t:.2f},{t+0.24:.2f})")
+ filters.append(f"[4:a]volume='{'+'.join(ring_expr) if ring_expr else '0*t'}',lowpass=f=1500[ring]")
+ filters.append(f"[5:a]volume='{'+'.join(knock_expr) if knock_expr else '0*t'}',lowpass=f=180[knocks]")
+ filters.append(f"[6:a]volume='{'+'.join(other_expr) if other_expr else '0*t'}',lowpass=f=1300[fx]")
+ filters.append("[voice][wind][drone][ring][knocks][fx]amix=inputs=6:duration=first:weights='1 0.16 0.12 0.22 0.26 0.14',loudnorm=I=-16:TP=-1.5:LRA=10[a]")
  filters.append("[0:v]subtitles=work/captions.ass:fontsdir=/usr/share/fonts/truetype/dejavu,format=yuv420p[v]")
  stamp=datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
  mp4=OUT/f"nexus-cinematic-v3-{stamp}.mp4"
