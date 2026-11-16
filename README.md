@@ -6,7 +6,7 @@ Cloud-first, private-by-default short-video generator. It creates original Spani
 
 - Manual `workflow_dispatch` only. No scheduled workflow is enabled.
 - No paid services or billing setup is required by this repository.
-- Google Drive upload is skipped unless the owner explicitly configures `GOOGLE_SERVICE_ACCOUNT_JSON` as a GitHub Actions secret.
+- Google Drive upload is skipped unless the owner configures the Google OAuth client JSON, refresh token and destination folder ID as GitHub Actions secrets/variables.
 - Make.com is an optional metadata-only coordinator; MP4 files are never sent through Make.
 - No social publishing integrations exist.
 
