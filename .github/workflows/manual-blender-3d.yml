@@ -1,5 +1,8 @@
 name: NEXUS Blender 3D prototype (manual)
 on:
+  pull_request:
+    branches: [main]
+    types: [synchronize]
   workflow_dispatch:
     inputs:
       samples:
@@ -8,14 +11,50 @@ on:
         default: "8"
 jobs:
   render:
+    if: ${{ github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && github.event.action == 'synchronize' && github.event.pull_request.head.ref == 'cinematic-reconstruction' && github.event.pull_request.base.ref == 'main') }}
     runs-on: ubuntu-latest
     timeout-minutes: 90
     permissions:
       contents: read
     steps:
+      - name: Verify event and exact source commit
+        shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          EVENT_ACTION: ${{ github.event.action }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_HEAD_REF: ${{ github.event.pull_request.head.ref }}
+          PR_BASE_REF: ${{ github.event.pull_request.base.ref }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          PR_HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
+          DISPATCH_REF: ${{ github.ref }}
+        run: |
+          set -euo pipefail
+          if [[ "$EVENT_NAME" == "pull_request" ]]; then
+            [[ "$EVENT_ACTION" == "synchronize" ]]
+            [[ "$PR_HEAD_REF" == "cinematic-reconstruction" ]]
+            [[ "$PR_BASE_REF" == "main" ]]
+            [[ "$PR_HEAD_REPO" == "$GITHUB_REPOSITORY" ]]
+            [[ "$PR_HEAD_SHA" =~ ^[0-9a-f]{40}$ ]]
+            echo "SOURCE_SHA=$PR_HEAD_SHA" >> "$GITHUB_ENV"
+            echo "PR_NUMBER=$PR_NUMBER" >> "$GITHUB_ENV"
+            echo "Validated PR #$PR_NUMBER head $PR_HEAD_SHA"
+          else
+            [[ "$DISPATCH_REF" == "refs/heads/cinematic-reconstruction" ]]
+            echo "SOURCE_SHA=$GITHUB_SHA" >> "$GITHUB_ENV"
+            echo "Validated manual branch $GITHUB_SHA"
+          fi
       - uses: actions/checkout@v4
         with:
-          ref: cinematic-reconstruction
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Confirm checked-out commit
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual=$(git rev-parse HEAD)
+          [[ "$actual" == "$SOURCE_SHA" ]]
+          echo "CHECKED_OUT_SHA=$actual"
+          git status --short
       - name: Measure dependency installation
         id: install
         shell: bash
