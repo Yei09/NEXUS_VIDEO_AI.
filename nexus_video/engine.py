@@ -46,7 +46,7 @@ def main():
  p=subprocess.run(["piper","--model",str(model),"--config",str(cfg),"--length_scale","1.12","--noise_scale","0.72","--noise_w","0.82","--output_file",str(wav)],input=script,text=True,capture_output=True)
  if p.returncode: raise RuntimeError("Piper TTS falló: "+p.stderr[-2000:])
  seconds=dur(wav)
- if not 25<=seconds<=60: raise RuntimeError(f"Duración de voz {seconds:.1f}s fuera de 25–60s.")
+ if not 30<=seconds<=60: raise RuntimeError(f"Duración de voz {seconds:.1f}s fuera de 25–60s.")
  imgs=[]
  for i,part in enumerate(parts):
   pth=WORK/f"scene-{i+1}.png"; draw_scene(pth,title,part,i+1,len(parts)); imgs.append(pth)
@@ -62,13 +62,13 @@ def main():
   for i,c in enumerate(chunks): f.write(f"{i+1}\n{ts(i*step)} --> {ts(min(seconds,(i+1)*step))}\n{c}\n\n")
  stamp=datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ"); mp4=OUT/f"nexus-terror-{stamp}.mp4"
  vf="scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,subtitles=work/captions.srt:force_style='FontName=DejaVu Sans,FontSize=34,PrimaryColour=&H00FFFFFF,OutlineColour=&H80000000,BorderStyle=1,Outline=3,Shadow=1,Alignment=2,MarginV=190'"
- fc=f"[0:v]{vf}[v];[2:a]volume=0.18,lowpass=f=180[a1];[3:a]volume=0.07,lowpass=f=650,afade=t=out:st={max(0,seconds-3):.2f}:d=3[a2];[a1][a2]amix=inputs=2:duration=longest,volume=0.55[m];[1:a][m]amix=inputs=2:duration=first:weights=1 0.32[a]"
- run(["ffmpeg","-y","-f","concat","-safe","0","-i",str(concat),"-i",str(wav),"-f","lavfi","-i",f"sine=frequency=48:sample_rate=44100:duration={seconds}","-f","lavfi","-i",f"anoisesrc=color=pink:amplitude=0.035:sample_rate=44100:duration={seconds}","-filter_complex",fc,"-map","[v]","-map","[a]","-c:v","libx264","-preset","veryfast","-pix_fmt","yuv420p","-r","30","-c:a","aac","-b:a","160k","-shortest","-movflags","+faststart",str(mp4)])
+ fc=f"[0:v]{vf}[v];[2:a]volume=0.18,lowpass=f=180[a1];[3:a]volume=0.07,lowpass=f=650,afade=t=out:st={max(0,seconds-3):.2f}:d=3[a2];[4:a]volume=0.035,tremolo=f=0.16:d=0.75[a3];[5:a]volume=0.025,tremolo=f=0.11:d=0.7[a4];[a1][a2][a3][a4]amix=inputs=4:duration=longest,volume=0.55[m];[1:a][m]amix=inputs=2:duration=first:weights='1 0.32'[a]"
+ run(["ffmpeg","-y","-f","concat","-safe","0","-i",str(concat),"-i",str(wav),"-f","lavfi","-i",f"sine=frequency=48:sample_rate=44100:duration={seconds}","-f","lavfi","-i",f"anoisesrc=color=pink:amplitude=0.035:sample_rate=44100:duration={seconds}","-f","lavfi","-i",f"sine=frequency=130.81:sample_rate=44100:duration={seconds}","-f","lavfi","-i",f"sine=frequency=164.81:sample_rate=44100:duration={seconds}","-filter_complex",fc,"-map","[v]","-map","[a]","-c:v","libx264","-preset","veryfast","-pix_fmt","yuv420p","-r","30","-c:a","aac","-b:a","160k","-shortest","-movflags","+faststart",str(mp4)])
  probe=json.loads(run(["ffprobe","-v","error","-show_streams","-show_format","-of","json",str(mp4)]))
  v=next((x for x in probe["streams"] if x.get("codec_type")=="video"),None); a=next((x for x in probe["streams"] if x.get("codec_type")=="audio"),None)
  if not v or not a or v.get("width")!=W or v.get("height")!=H or v.get("codec_name")!="h264": raise RuntimeError("Validación de vídeo/audio fallida.")
  final=float(probe["format"]["duration"])
- if not 25<=final<=60: raise RuntimeError("Duración final fuera de 25–60s.")
+ if not 30<=final<=60: raise RuntimeError("Duración final fuera de 25–60s.")
  meta={"status":"rendered","created_at":datetime.now(timezone.utc).isoformat(),"genre":genre,"title":title,"script":script,"file":str(mp4),"size_bytes":mp4.stat().st_size,"duration_seconds":round(final,2),"width":W,"height":H,"video_codec":"h264","audio_codec":"aac","voice":voice,"ambience":"original_synthesized_horror_drone","social_publishing":False}
  (OUT/"metadata.json").write_text(json.dumps(meta,ensure_ascii=False,indent=2),encoding="utf-8"); (OUT/"script.txt").write_text(script,encoding="utf-8")
  print(json.dumps(meta,ensure_ascii=False,indent=2))
