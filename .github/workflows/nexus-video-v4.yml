@@ -2,14 +2,6 @@ name: NEXUS VIDEO AI V4 Production
 on:
   workflow_dispatch:
     inputs:
-      operation:
-        description: render creates a new video; upload_only retries Drive from an existing artifact
-        type: choice
-        required: true
-        default: render
-        options:
-          - render
-          - upload_only
       request_id:
         description: UUID unique per request; leave empty only for a manual run
         type: string
@@ -93,8 +85,6 @@ jobs:
     timeout-minutes: 90
     env:
       REQUEST_ID: ${{ inputs.request_id }}
-      OPERATION: ${{ inputs.operation }}
-      SOURCE_RUN_ID: ${{ inputs.source_run_id }}
       CATEGORY: ${{ inputs.category }}
       DURATION_SECONDS: ${{ inputs.duration_seconds }}
       PIPER_VOICE: ${{ inputs.voice }}
@@ -154,22 +144,6 @@ jobs:
               f.write("request_id="+parsed+"\n")
           print("request_id="+parsed)
           PY
-      - name: Validate upload-only inputs
-        if: ${{ inputs.operation == 'upload_only' }}
-        run: |
-          test -n "${{ inputs.request_id }}" || (echo "request_id is required for upload_only" && exit 1)
-          test -n "${{ inputs.source_run_id }}" || (echo "source_run_id is required for upload_only" && exit 1)
-      - name: Notify Make that processing started
-        if: ${{ inputs.operation == 'render' }}
-        continue-on-error: true
-        env:
-          NEXUS_STATUS: processing
-          REQUEST_ID: ${{ steps.request.outputs.request_id }}
-          ARTIFACT_NAME: nexus-v4-${{ steps.request.outputs.request_id }}
-          GITHUB_RUN_ID: ${{ github.run_id }}
-          GITHUB_SERVER_URL: ${{ github.server_url }}
-          GITHUB_REPOSITORY: ${{ github.repository }}
-        run: python -m nexus_video.notify_make_v4
       - name: Render V4.2.1 video
         id: render
         if: ${{ inputs.operation == 'render' }}
@@ -197,7 +171,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: nexus-v4-d8effcfb-cbdd-4e1f-ba08-d784bf1c681f
-          path: baseline-v4.1
+          path: baseline-v4.2
           github-token: ${{ secrets.GITHUB_TOKEN }}
           repository: ${{ github.repository }}
           run-id: 43821467642
@@ -250,17 +224,11 @@ jobs:
           assert motion.get("scene_diversity_pass") is True, "Scene diversity threshold failed"
           assert motion.get("motion_threshold") == 1.25, "Motion threshold was changed"
           assert motion.get("scene_diversity_threshold") == 7.0, "Diversity threshold was changed"
+          layers=motion.get("independent_layer_manifest", [])
+          assert len(layers) == 6, "Missing independent layer manifest for six scenes"
+          assert all(len(scene_layers) >= 1 for scene_layers in layers), "A scene has no independent layers"
           print(f"DELIVERABLES_OK mp4={sys.argv[1]} duration={duration:.3f}s target={target:.3f}s")
           PY
-      - name: Download a previous artifact for Drive-only retry
-        if: ${{ inputs.operation == 'upload_only' }}
-        uses: actions/download-artifact@v4
-        with:
-          name: nexus-v4-${{ steps.request.outputs.request_id }}
-          path: output/${{ steps.request.outputs.request_id }}/
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          repository: ${{ github.repository }}
-          run-id: ${{ inputs.source_run_id }}
       - name: Preserve V4.2.1 output as GitHub artifact
         if: ${{ always() }}
         uses: actions/upload-artifact@v4
@@ -269,42 +237,3 @@ jobs:
           path: output/${{ steps.request.outputs.request_id }}/
           if-no-files-found: warn
           retention-days: 14
-      - name: Notify Make that Drive upload started
-        if: ${{ (inputs.operation == 'render' && steps.render.outcome == 'success') || inputs.operation == 'upload_only' }}
-        continue-on-error: true
-        env:
-          NEXUS_STATUS: uploading_drive
-          REQUEST_ID: ${{ steps.request.outputs.request_id }}
-          ARTIFACT_NAME: nexus-v4-${{ steps.request.outputs.request_id }}
-          GITHUB_RUN_ID: ${{ github.run_id }}
-          GITHUB_SERVER_URL: ${{ github.server_url }}
-          GITHUB_REPOSITORY: ${{ github.repository }}
-        run: python -m nexus_video.notify_make_v4
-      - name: Upload and verify all files in Google Drive
-        id: drive
-        if: ${{ ((inputs.operation == 'render' && steps.render.outcome == 'success') || inputs.operation == 'upload_only') && env.DRIVE_CONFIGURED == 'true' }}
-        env:
-          REQUEST_ID: ${{ steps.request.outputs.request_id }}
-        run: |
-          mkdir -p "output/$REQUEST_ID/errors"
-          set -o pipefail
-          python -m nexus_video.drive_v4 2>&1 | tee "output/$REQUEST_ID/errors/drive_upload.log"
-      - name: Preserve Drive failure log in GitHub artifact
-        if: ${{ failure() && steps.drive.outcome == 'failure' }}
-        uses: actions/upload-artifact@v4
-        with:
-          name: nexus-v4-${{ steps.request.outputs.request_id }}
-          path: output/${{ steps.request.outputs.request_id }}/
-          if-no-files-found: warn
-          retention-days: 14
-          overwrite: true
-      - name: Send final status to Make
-        if: ${{ always() }}
-        env:
-          NEXUS_STATUS: ${{ steps.drive.outcome == 'success' && 'completed' || steps.drive.outcome == 'failure' && 'drive_upload_failed' || (inputs.operation == 'render' && steps.render.outcome == 'success' && 'rendered') || (inputs.operation == 'render' && steps.render.outcome == 'failure' && 'render_failed') || 'error' }}
-          REQUEST_ID: ${{ steps.request.outputs.request_id }}
-          ARTIFACT_NAME: nexus-v4-${{ steps.request.outputs.request_id }}
-          GITHUB_RUN_ID: ${{ github.run_id }}
-          GITHUB_SERVER_URL: ${{ github.server_url }}
-          GITHUB_REPOSITORY: ${{ github.repository }}
-        run: python -m nexus_video.notify_make_v4
