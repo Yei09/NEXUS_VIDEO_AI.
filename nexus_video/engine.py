@@ -6,7 +6,7 @@ from PIL import Image, ImageDraw, ImageFont
 
 ROOT=Path(__file__).resolve().parents[1]
 OUT=ROOT/"output"; WORK=ROOT/"work"; W,H=1080,1920
-DEMO=("¿Sabías que tu cerebro sigue trabajando mientras duermes? Durante el sueño organiza recuerdos, procesa emociones y refuerza aprendizajes. Por eso descansar no es perder el tiempo: es una parte esencial de aprender. Una rutina sencilla ayuda: baja la luz, evita pantallas antes de acostarte y procura dormir a una hora parecida cada noche. Tu descanso también merece un lugar en tu lista de prioridades.")
+DEMO=("¿Sabías que tu cerebro sigue trabajando mientras duermes? Durante el sueño organiza recuerdos, procesa emociones y refuerza aprendizajes. Por eso descansar no es perder el tiempo: es una parte esencial de aprender. Una rutina sencilla ayuda: baja la luz, evita pantallas antes de acostarte y procura dormir a una hora parecida cada noche. Tu descanso también merece un lugar en tu lista de prioridades. Incluso una breve siesta puede ayudarte si estás agotado, pero mantén una rutina nocturna constante.")
 
 def run(cmd, input_text=None):
     p=subprocess.run(cmd,input=input_text,text=True,capture_output=True)
@@ -30,9 +30,9 @@ def main():
         if not path.exists(): print("Descargando "+path.name); urllib.request.urlretrieve(url,path)
     if model.stat().st_size<100000 or config.stat().st_size<100: raise RuntimeError("Modelo Piper incompleto.")
     wav=WORK/"narration.wav"
-    run(["piper","--model",str(model),"--config",str(config),"--output_file",str(wav)],script)
+    run(["piper","--model",str(model),"--config",str(config),"--length_scale","1.15","--output_file",str(wav)],script)
     seconds=duration(wav)
-    if not 25<=seconds<=75: raise RuntimeError(f"Duración de narración no válida: {seconds:.1f}s")
+    if not 30<=seconds<=60: raise RuntimeError(f"Duración de narración no válida: {seconds:.1f}s")
     im=Image.new("RGB",(W,H)); px=im.load()
     for y in range(H):
         t=y/H
@@ -59,14 +59,15 @@ def main():
     with srt.open("w",encoding="utf-8") as f:
         for i,c in enumerate(chunks): f.write(f"{i+1}\n{ts(i*step)} --> {ts(min(seconds,(i+1)*step))}\n{c}\n\n")
     stamp=datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ"); mp4=OUT/f"nexus-video-{stamp}.mp4"
-    vf="scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,subtitles=work/captions.srt:force_style='FontName=DejaVu Sans,FontSize=19,PrimaryColour=&H00FFFFFF,OutlineColour=&H80000000,BorderStyle=1,Outline=2,Shadow=1,Alignment=2,MarginV=170'"
-    run(["ffmpeg","-y","-loop","1","-i",str(bg),"-i",str(wav),"-vf",vf,"-c:v","libx264","-preset","veryfast","-tune","stillimage","-pix_fmt","yuv420p","-r","30","-c:a","aac","-b:a","160k","-shortest","-movflags","+faststart",str(mp4)])
+    vf="scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,subtitles=work/captions.srt:force_style='FontName=DejaVu Sans,FontSize=38,PrimaryColour=&H00FFFFFF,OutlineColour=&H80000000,BorderStyle=1,Outline=2,Shadow=1,Alignment=2,MarginV=170'"
+    music=f"[0:v]{vf}[v];[2:a]volume=0.035[a1];[3:a]volume=0.025[a2];[a1][a2]amix=inputs=2:duration=longest,afade=t=out:st={max(0,seconds-2):.2f}:d=2[m];[1:a][m]amix=inputs=2:duration=first[a]"
+    run(["ffmpeg","-y","-loop","1","-i",str(bg),"-i",str(wav),"-f","lavfi","-i",f"sine=frequency=220:sample_rate=44100:duration={seconds}","-f","lavfi","-i",f"sine=frequency=277.18:sample_rate=44100:duration={seconds}","-filter_complex",music,"-map","[v]","-map","[a]","-c:v","libx264","-preset","veryfast","-tune","stillimage","-pix_fmt","yuv420p","-r","30","-c:a","aac","-b:a","160k","-shortest","-movflags","+faststart",str(mp4)])
     probe=json.loads(run(["ffprobe","-v","error","-show_streams","-show_format","-of","json",str(mp4)]))
     vs=next((x for x in probe["streams"] if x.get("codec_type")=="video"),None)
     aus=next((x for x in probe["streams"] if x.get("codec_type")=="audio"),None)
     if not vs or not aus or vs.get("width")!=W or vs.get("height")!=H: raise RuntimeError("Validación de audio/vídeo o resolución fallida.")
     final=float(probe["format"]["duration"])
-    if not 25<=final<=75: raise RuntimeError("Duración final fuera del rango esperado.")
+    if not 30<=final<=60: raise RuntimeError("Duración final fuera del rango esperado.")
     meta={"status":"rendered","created_at":datetime.now(timezone.utc).isoformat(),"title":title,"script":script,"file":str(mp4),"size_bytes":mp4.stat().st_size,"duration_seconds":round(final,2),"width":W,"height":H,"voice":voice,"social_publishing":False}
     (OUT/"metadata.json").write_text(json.dumps(meta,ensure_ascii=False,indent=2),encoding="utf-8")
     (OUT/"script.txt").write_text(script,encoding="utf-8")
