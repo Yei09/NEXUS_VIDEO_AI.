@@ -109,7 +109,7 @@ jobs:
       - name: Validate dispatch branch and print GitHub context
         shell: bash
         env:
-          EXPECTED_REF: refs/heads/v4-make-drive
+          EXPECTED_REF: refs/heads/v4.1-stability
         run: |
           echo "github.event_name=$GITHUB_EVENT_NAME"
           echo "github.ref=$GITHUB_REF"
@@ -119,13 +119,13 @@ jobs:
             exit 1
           fi
           if [[ "$GITHUB_REF" != "$EXPECTED_REF" ]]; then
-            echo "::error title=Wrong branch::Select v4-make-drive in the Run workflow branch selector. No production code was checked out."
+            echo "::error title=Wrong branch::Select v4.1-stability in the Run workflow branch selector. No production code was checked out."
             exit 1
           fi
       - name: Checkout V4 branch
         uses: actions/checkout@v4
         with:
-          ref: v4-make-drive
+          ref: v4.1-stability
       - name: Install FFmpeg and fonts
         run: |
           sudo apt-get update
@@ -209,8 +209,11 @@ jobs:
           test -s "$output_dir/audios/music.wav"
           test -s "$output_dir/audios/effects.wav"
           test -s "$output_dir/audios/audio_mix.wav"
-          python - "$mp4" <<'PY'
-          import json, subprocess, sys
+          python - "$mp4" "$output_dir/audios/narration.wav" "$output_dir/audios/audio_mix.wav" <<'PY'
+          import json, subprocess, sys, os
+          def media_duration(path):
+              data = json.loads(subprocess.check_output(["ffprobe", "-v", "error", "-show_format", "-of", "json", path], text=True))
+              return float(data["format"]["duration"])
           probe = json.loads(subprocess.check_output([
               "ffprobe", "-v", "error", "-show_streams", "-show_format", "-of", "json", sys.argv[1]
           ], text=True))
@@ -222,8 +225,12 @@ jobs:
           assert video.get("r_frame_rate") == "30/1", "Video is not 30 fps"
           assert audio and audio.get("codec_name") == "aac", "MP4 lacks AAC audio"
           duration = float(probe["format"]["duration"])
+          target = float(os.environ["DURATION_SECONDS"])
+          assert abs(duration-target) <= 0.15, f"MP4 duration {duration:.3f}s != target {target:.3f}s"
+          assert abs(media_duration(sys.argv[2])-target) <= 0.15, "Narration WAV duration mismatch"
+          assert abs(media_duration(sys.argv[3])-target) <= 0.15, "Audio mix WAV duration mismatch"
           assert 30 <= duration <= 60, f"Unexpected duration: {duration}"
-          print(f"DELIVERABLES_OK mp4={sys.argv[1]} duration={duration:.2f}s")
+          print(f"DELIVERABLES_OK mp4={sys.argv[1]} duration={duration:.3f}s target={target:.3f}s")
           PY
       - name: Download a previous artifact for Drive-only retry
         if: ${{ inputs.operation == 'upload_only' }}
