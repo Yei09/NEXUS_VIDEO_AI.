@@ -1,5 +1,6 @@
 """Procedural 3D horror corridor, armature-driven actor, animated door/shadow and camera."""
-import bpy, math, json, os
+import bpy, math, json, os, time
+BUILD_STARTED=time.perf_counter()
 from mathutils import Vector
 OUT=os.environ.get("NEXUS_RENDER_OUT","artifacts/blender3d/frames")
 SAMPLES=int(os.environ.get("NEXUS_SAMPLES","8"))
@@ -95,5 +96,9 @@ def build():
   s.frame_set(f); camera_samples.append({"frame":f,"seconds":(f-1)/30,"location":[round(v,4) for v in cam.matrix_world.translation],"rotation":[round(v,4) for v in cam.rotation_euler]})
  report={"engine":"Cycles CPU","resolution":[1080,1920],"fps":30,"frames":300,"samples":SAMPLES,"geometry_objects":len(s.objects),"rig_bones":len(arm.bones),"door":"DOOR_HINGE_ANIMATED","character":"CHARACTER_RIG","shadow":"INDEPENDENT_SHADOW_ENTITY","camera":"CINEMATIC_FOLLOW_CAMERA","camera_samples":camera_samples}
  with open(os.path.join(os.path.dirname(OUT),"scene_manifest.json"),"w") as f: json.dump(report,f,indent=2)
- bpy.ops.render.render(animation=True)
+ prep_seconds=time.perf_counter()-BUILD_STARTED
+ timing_path=os.path.join(os.path.dirname(OUT),"blender_timing.json")
+ with open(timing_path,"w") as f: json.dump({"preparation_seconds":round(prep_seconds,3)},f)
+ render_started=time.perf_counter(); bpy.ops.render.render(animation=True)
+ with open(timing_path,"w") as f: json.dump({"preparation_seconds":round(prep_seconds,3),"render_seconds":round(time.perf_counter()-render_started,3)},f)
 build()
