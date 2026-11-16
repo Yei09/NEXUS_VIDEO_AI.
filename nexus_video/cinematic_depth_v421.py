@@ -88,11 +88,39 @@ def _prop_layer(size, event, t, frame_no):
         d.line(points, fill=(4,5,7,255), width=19, joint="curve")
         d.line(points, fill=(185,160,124,255), width=10, joint="curve")
         return SceneLayer("moving_cable", layer, .88, camera_weight=1.1)
-    if action in {"screen_call", "lights_flicker", "window_flicker"}:
+    if action in {"screen_call", "lights_flicker", "window_flicker", "lamp_flicker"}:
         alpha=int(100+80*abs(pulse))
         d.ellipse((w*.37,h*.30,w*.63,h*.60), fill=(68,155,210,alpha))
         return SceneLayer("phone_screen_glow" if action=="screen_call" else "practical_light",
                           layer, .42, blur=18, camera_weight=.45)
+    if action == "seat_sink":
+        y=int(h*.59+18*max(0.0,math.sin(t*math.pi)))
+        d.rounded_rectangle((w*.20,y,w*.80,y+h*.15),radius=18,
+                            fill=(24,27,34,245),outline=(112,119,125,220),width=5)
+        return SceneLayer("sinking_empty_seat",layer,.72,camera_weight=1.0)
+    if action == "ticket_reveal":
+        angle=math.sin(t*math.pi)*12
+        d.polygon([(w*.34,h*.48),(w*.66,h*.46+angle),(w*.68,h*.66),(w*.32,h*.68)],
+                  fill=(180,166,132,245),outline=(225,215,185,255))
+        return SceneLayer("revealing_ticket",layer,.82,rotation=angle*.25,camera_weight=1.0)
+    if action == "tap_turn":
+        angle=math.sin(t*math.pi*2)*18
+        d.line((w*.5,h*.48,w*.5+angle,h*.42),fill=(170,183,190,255),width=13)
+        d.ellipse((w*.47,h*.46,w*.53,h*.52),fill=(95,111,120,255))
+        return SceneLayer("turning_faucet",layer,.78,camera_weight=1.0)
+    if action == "reflection_smile":
+        d.ellipse((w*.39,h*.29,w*.61,h*.52),fill=(7,10,15,225))
+        d.arc((w*.43,h*.37,w*.57,h*.49),5,175,fill=(185,194,199,230),width=5)
+        return SceneLayer("independent_reflection",layer,.52,blur=1.5,camera_weight=.8)
+    if action == "writing_appear":
+        alpha=int(80+170*max(0.0,min(1.0,t*1.7)))
+        d.text((w*.31,h*.53),"SAL DE AQUÍ",fill=(225,232,236,alpha))
+        return SceneLayer("mirror_writing",layer,.55,blur=.3,camera_weight=.7)
+    if action == "mirror_break":
+        for i in range(5):
+            x=int(w*(.35+i*.075))
+            d.line((w*.5,h*.32,x,h*(.48+i*.055)),fill=(195,211,220,220),width=3)
+        return SceneLayer("mirror_fracture",layer,.54,camera_weight=.7)
     return None
 
 
