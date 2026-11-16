@@ -1,5 +1,5 @@
 import unittest
-from PIL import Image, ImageChops, ImageStat
+from PIL import Image, ImageChops, ImageDraw, ImageStat
 
 from nexus_video.cinematic_v42 import cinematic_camera, cinematic_finish
 
@@ -7,6 +7,13 @@ from nexus_video.cinematic_v42 import cinematic_camera, cinematic_finish
 class CinematicV42Tests(unittest.TestCase):
     def setUp(self):
         self.base = Image.new("RGBA", (540, 960), (18, 22, 29, 255))
+        draw = ImageDraw.Draw(self.base, "RGBA")
+        for y in range(0, 960, 32):
+            shade = 12 + y // 40
+            draw.rectangle((0, y, 540, y+32), fill=(shade, shade+5, shade+11, 255))
+        draw.polygon([(40, 120), (490, 120), (380, 850), (130, 850)],
+                     fill=(36, 42, 52, 255), outline=(110, 118, 128, 255), width=5)
+        draw.line((270, 120, 270, 850), fill=(140, 120, 95, 180), width=6)
 
     def test_cinematic_finish_preserves_frame_dimensions(self):
         event = {"scene": "hallway", "action": "shadow_cross"}
@@ -38,7 +45,8 @@ class CinematicV42Tests(unittest.TestCase):
         a = cinematic_camera(self.base, dolly, 0.6, 40, 90, 7019)
         b = cinematic_camera(self.base, track, 0.6, 40, 90, 7019)
         self.assertEqual(a.size, self.base.size)
-        self.assertEqual(a, cinematic_camera(self.base, dolly, 0.6, 40, 90, 7019))
+        same = cinematic_camera(self.base, dolly, 0.6, 40, 90, 7019)
+        self.assertIsNone(ImageChops.difference(a, same).getbbox())
         self.assertGreater(ImageStat.Stat(ImageChops.difference(a, b)).mean[0], 0.1)
 
 
