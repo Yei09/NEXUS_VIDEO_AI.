@@ -4,12 +4,12 @@ from pathlib import Path
 import cv2,numpy as np
 p=Path(sys.argv[1]); video=p/"nexus_blender3d_10s.mp4"
 def probe():
- d=json.loads(subprocess.check_output(["ffprobe","-v","error","-show_streams","-show_format","-of","json",str(video)]))
+ d=json.loads(subprocess.check_output(["ffprobe","-v","error","-count_frames","-show_streams","-show_format","-of","json",str(video)]))
  v=next(x for x in d["streams"] if x["codec_type"]=="video"); a=next(x for x in d["streams"] if x["codec_type"]=="audio")
  assert v["codec_name"]=="h264" and (v["width"],v["height"])==(1080,1920)
  assert abs(float(v["r_frame_rate"].split("/")[0])/float(v["r_frame_rate"].split("/")[1])-30)<.001
  assert a["codec_name"]=="aac" and abs(float(d["format"]["duration"])-10)<.03
- assert int(v["nb_frames"])==300
+ assert int(v.get("nb_read_frames",v.get("nb_frames","0")))==300
  return d
 def diff_at(ts):
  cap=cv2.VideoCapture(str(video)); imgs=[]
