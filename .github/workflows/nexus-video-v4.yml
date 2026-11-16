@@ -67,11 +67,6 @@ on:
         type: boolean
         required: true
         default: false
-      source_run_id:
-        description: Required only for upload_only; source GitHub Actions run ID
-        type: string
-        required: false
-        default: ""
 permissions:
   contents: read
   actions: read
@@ -146,7 +141,7 @@ jobs:
           PY
       - name: Render V4.2.1 video
         id: render
-        if: ${{ inputs.operation == 'render' }}
+        if: ${{ github.event_name == 'workflow_dispatch' }}
         env:
           REQUEST_ID: ${{ steps.request.outputs.request_id }}
           CATEGORY: ${{ env.CATEGORY }}
@@ -167,7 +162,7 @@ jobs:
           python -m unittest discover -s tests -v
           python -m nexus_video.engine_v4
       - name: Download protected V4.2 baseline artifact
-        if: ${{ inputs.operation == 'render' && steps.render.outcome == 'success' }}
+        if: ${{ github.event_name == 'workflow_dispatch' && steps.render.outcome == 'success' }}
         uses: actions/download-artifact@v4
         with:
           name: nexus-v4-d8effcfb-cbdd-4e1f-ba08-d784bf1c681f
@@ -176,13 +171,13 @@ jobs:
           repository: ${{ github.repository }}
           run-id: 43821467642
       - name: Compare six encoded scenes against V4.2
-        if: ${{ inputs.operation == 'render' && steps.render.outcome == 'success' }}
+        if: ${{ github.event_name == 'workflow_dispatch' && steps.render.outcome == 'success' }}
         run: |
           python tools/compare_v42_v421.py baseline-v4.2 output/$REQUEST_ID output/$REQUEST_ID/comparison
           test -s output/$REQUEST_ID/comparison/comparison_report.json
           test -s output/$REQUEST_ID/comparison/v4.2-vs-v4.2.1-contact-sheet.jpg
       - name: Verify rendered V4.2.1 MP4 and audio deliverables
-        if: ${{ inputs.operation == 'render' }}
+        if: ${{ github.event_name == 'workflow_dispatch' }}
         shell: bash
         run: |
           set -euo pipefail
