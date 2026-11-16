@@ -1,0 +1,59 @@
+name: NEXUS Video - Manual Test
+on:
+  workflow_dispatch:
+    inputs:
+      title:
+        description: Título del vídeo de prueba
+        required: true
+        default: Lo que tu cerebro hace mientras duermes
+      script:
+        description: Guion en español (mínimo 45 palabras)
+        required: false
+        default: ¿Sabías que tu cerebro sigue trabajando mientras duermes? Durante el sueño organiza recuerdos, procesa emociones y refuerza aprendizajes. Por eso descansar no es perder el tiempo: es una parte esencial de aprender. Una rutina sencilla ayuda: baja la luz, evita pantallas antes de acostarte y procura dormir a una hora parecida cada noche. Tu descanso también merece un lugar en tu lista de prioridades.
+permissions:
+  contents: read
+concurrency:
+  group: nexus-video-manual-test
+  cancel-in-progress: false
+jobs:
+  render:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install FFmpeg
+        run: sudo apt-get update && sudo apt-get install -y ffmpeg fonts-dejavu-core
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - name: Install dependencies
+        run: python -m pip install --upgrade pip && pip install -r requirements.txt
+      - name: Render narrated MP4
+        env:
+          VIDEO_TITLE: \${{ inputs.title }}
+          VIDEO_SCRIPT: \${{ inputs.script }}
+          PIPER_VOICE: es_MX-ald-medium
+        run: python -m nexus_video.engine
+      - name: Upload MP4 artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: nexus-video-manual-test
+          path: |
+            output/*.mp4
+            output/metadata.json
+            output/script.txt
+          if-no-files-found: error
+          retention-days: 14
+      - name: Upload and verify Google Drive
+        if: \${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON != '' }}
+        env:
+          GOOGLE_SERVICE_ACCOUNT_JSON: \${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
+          GOOGLE_DRIVE_FOLDER_ID: \${{ vars.GOOGLE_DRIVE_FOLDER_ID }}
+        run: python -m nexus_video.drive_upload
+      - name: Notify Make with metadata only
+        if: \${{ always() && secrets.MAKE_WEBHOOK_URL != '' }}
+        env:
+          MAKE_WEBHOOK_URL: \${{ secrets.MAKE_WEBHOOK_URL }}
+          JOB_STATUS: \${{ job.status }}
+        run: python -m nexus_video.notify_make
