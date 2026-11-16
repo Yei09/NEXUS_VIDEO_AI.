@@ -446,12 +446,14 @@ def write_reports(out, story, events, scene_metrics, first_frames, starts, lengt
         "valid": bool(video and audio and video.get("codec_name") == "h264" and audio.get("codec_name") == "aac"
                       and video.get("width") == W and video.get("height") == H
                       and video.get("r_frame_rate") == "30/1" and 30 <= duration <= 60
+                      and abs(duration-media_duration(audio_mix)) <= 0.15
                       and motion_pass and diversity_pass),
         "duration_seconds": round(duration, 3), "width": video.get("width"), "height": video.get("height"),
         "fps": video.get("r_frame_rate"), "video_codec": video.get("codec_name"),
         "audio_codec": audio.get("codec_name"), "pixel_format": video.get("pix_fmt"),
         "video_size_bytes": mp4.stat().st_size, "narration_duration_seconds": round(media_duration(narration), 3),
         "audio_mix_duration_seconds": round(media_duration(audio_mix), 3),
+        "audio_video_duration_delta_seconds": round(abs(duration-media_duration(audio_mix)), 3),
         "narration_file": narration.name, "audio_mix_file": audio_mix.name,
         "ffprobe_format": probe.get("format", {}).get("format_name"),
     }
@@ -473,7 +475,7 @@ def write_reports(out, story, events, scene_metrics, first_frames, starts, lengt
         "video_codec": "h264", "audio_codec": "aac", "scene_count": len(events),
         "scene_diversity_verified": diversity_pass, "motion_verified": motion_pass,
         "files": {"video": mp4.name, "narration": narration.name, "audio_mix": audio_mix.name,
-                  "story": "story.txt", "script": "script.txt", "motion_report": "motion_report.json",
+                  "story": "historia.txt", "script": "script.txt", "motion_report": "motion_report.json",
                   "render_report": "render_report.json", "thumbnail": "thumbnail.jpg"},
         "social_publishing": False, "make_status": "pending_callback", "drive_status": "pending"
     }
@@ -514,6 +516,7 @@ def main():
     voice = get_voice(request["voice"])
     story = generate_story(request["category"], request_id)
     (out/"story.txt").write_text(story["script"], encoding="utf-8")
+    (out/"historia.txt").write_text(story["script"], encoding="utf-8")
     (out/"script.txt").write_text("\n".join(e["text"] for e in story["events"]), encoding="utf-8")
     (out/"story_events.json").write_text(json.dumps(story, ensure_ascii=False, indent=2), encoding="utf-8")
     (out/"errors").mkdir(exist_ok=True)
@@ -597,7 +600,7 @@ def main():
              "-vf", f"subtitles={subtitles}:fontsdir=/usr/share/fonts/truetype/dejavu,format=yuv420p",
              "-map", "0:v:0", "-map", "1:a:0", "-c:v", "libx264", "-preset", "slow", "-crf", "17",
              "-pix_fmt", "yuv420p", "-r", "30", "-c:a", "aac", "-b:a", "192k", "-ar", "44100",
-             "-movflags", "+faststart", str(mp4)])
+             "-movflags", "+faststart", "-shortest", str(mp4)])
         first_frames[0].save(out/"thumbnail.jpg", quality=92)
         report_dir = out/"reports"
         report_dir.mkdir(exist_ok=True)
