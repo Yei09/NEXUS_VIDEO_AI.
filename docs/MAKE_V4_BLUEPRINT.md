@@ -53,7 +53,7 @@ Módulos en este orden:
    - si operation=upload_only, request_id y source_run_id son obligatorios.
 3. Usa un Router según operation:
    - Ruta render: Data Store > Add/Replace a Record con Key=request_id y Overwrite desactivado. Si la clave ya existe, la operación falla; la ruta de error responde HTTP 409 duplicate_request y no despacha un nuevo render.
-   - Ruta upload_only: Data Store > Get a Record con Key=request_id. Solo continúa si el registro existe, status=error, stage=drive_upload_failed y run_id coincide exactamente con source_run_id. Después usa Data Store > Update a Record para status=pending, stage=drive_retry. Si no coincide, responde HTTP 409 retry_not_allowed.
+   - Ruta upload_only: Data Store > Get a Record con Key=request_id. Solo continúa si el registro existe, status=error, stage=drive_upload_failed y el campo source_run_id del registro coincide exactamente con source_run_id de la solicitud. Después usa Data Store > Update a Record para status=pending, stage=drive_retry. Si no coincide, responde HTTP 409 retry_not_allowed.
    Activa Process data in order en la configuración del escenario para serializar las solicitudes y reducir carreras entre comprobación y escritura.
 4. HTTP > Make a request (HTTP v4):
    - Method: POST
@@ -102,7 +102,7 @@ Crea un Fine-grained personal access token limitado al repositorio Yei09/NEXUS_V
 
 1. Webhooks > Custom webhook: NEXUS_V4_GENERATION_CALLBACK.
 2. Data Store > Get a Record usando request_id.
-3. Actualiza status, stage, run_id, run_url, artifact_name, metadata, drive links, error y updated_at.
+3. Actualiza status, stage, run_id (run actual), run_url, artifact_name, metadata, drive links, error y updated_at. Para source_run_id: en operation=render, inicialízalo con el primer run_id; en operation=upload_only, conserva el source_run_id original recibido y no lo sustituyas por el run_id de reintento.
 4. Normaliza:
    - processing → status=processing, stage=rendering
    - story_created → status=processing, stage=story_created
