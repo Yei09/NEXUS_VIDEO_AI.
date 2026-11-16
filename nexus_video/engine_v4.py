@@ -535,7 +535,7 @@ def main():
         voice = get_voice(request["voice"])
     except Exception as exc:
         (out/"errors"/"render_error.log").write_text(
-            f"{datetime.now(timezone.utc).isoformat()}\\n{type(exc).__name__}: {exc}\\n", encoding="utf-8")
+            f"{datetime.now(timezone.utc).isoformat()}\n{type(exc).__name__}: {exc}\n", encoding="utf-8")
         raise
     story = generate_story(request["category"], request_id)
     (out/"story.txt").write_text(story["script"], encoding="utf-8")
