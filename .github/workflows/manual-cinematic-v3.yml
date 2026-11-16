@@ -48,6 +48,10 @@ jobs:
           m=json.load(open("output/metadata.json",encoding="utf-8"))
           assert m["scene_count"] >= 5
           assert len(set(m["scene_types"])) == m["scene_count"], m["scene_types"]
+          assert m["motion_verified"] and m["scene_diversity_verified"]
+          report=json.load(open("output/motion_report.json",encoding="utf-8"))
+          assert report["motion_pass"] and report["scene_diversity_pass"]
+          assert all(x["mean_frame_difference"] >= 1.0 for x in report["motion"])
           assert m["width"] == 1080 and m["height"] == 1920 and m["fps"] == 30
           assert 30 <= m["duration_seconds"] <= 60
           assert len(glob.glob("output/voice-samples/*.wav")) == 4
@@ -63,6 +67,7 @@ jobs:
             output/narration.wav
             output/voice-samples/*.wav
             output/metadata.json
+            output/motion_report.json
             output/script.txt
           if-no-files-found: error
           retention-days: 14
