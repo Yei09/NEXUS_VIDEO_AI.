@@ -273,15 +273,29 @@ def render_frame(event, t, frame_no, total_frames, seed):
     d = ImageDraw.Draw(im, "RGBA")
     phase = t * 2 * math.pi
     # Event-specific foreground action; no single scene plate is reused.
-    if event["action"] in ("phone_ring", "screen_call"):
-        cx, cy = (275, 565) if scene == "phone_room" else (275, 455)
+    if event["action"] == "phone_ring":
+        # A landline handset/base: deliberately horizontal and placed on the room table.
+        cx, cy = 275, 565
         wobble = int(8 * math.sin(phase * 5))
-        d.rounded_rectangle((cx-90+wobble, cy-48, cx+90+wobble, cy+48), radius=22, fill=(22, 21, 22, 255), outline=(145, 127, 98, 255), width=7)
-        d.arc((cx-60+wobble, cy-32, cx+60+wobble, cy+32), 0, 360, fill=(175, 154, 118, 220), width=4)
+        d.rounded_rectangle((cx-105+wobble, cy-58, cx+105+wobble, cy+58), radius=24, fill=(22, 21, 22, 255), outline=(165, 145, 112, 255), width=8)
+        d.arc((cx-72+wobble, cy-42, cx+72+wobble, cy+42), 0, 360, fill=(185, 164, 128, 230), width=5)
         for k in range(10):
             x = cx-44+(k%5)*22+wobble
             y = cy-10+(k//5)*23
             d.ellipse((x, y, x+8, y+8), fill=(3, 4, 6, 255))
+    elif event["action"] == "screen_call":
+        # A vertical mobile phone with a lit incoming-call screen, not a duplicate landline.
+        cx, cy = 275, 455
+        wobble = int(5 * math.sin(phase * 5))
+        d.rounded_rectangle((cx-78+wobble, cy-150, cx+78+wobble, cy+150), radius=25,
+                            fill=(2, 4, 8, 255), outline=(150, 165, 175, 255), width=8)
+        d.rounded_rectangle((cx-61+wobble, cy-126, cx+61+wobble, cy+126), radius=14,
+                            fill=(18, 34, 48, 255), outline=(75, 105, 125, 255), width=3)
+        d.ellipse((cx-19+wobble, cy-92, cx+19+wobble, cy-54), fill=(95, 135, 155, 230))
+        d.rounded_rectangle((cx-42+wobble, cy-35, cx+42+wobble, cy-25), radius=5, fill=(185, 198, 205, 210))
+        d.rounded_rectangle((cx-30+wobble, cy-7, cx+30+wobble, cy+1), radius=4, fill=(130, 150, 165, 190))
+        d.ellipse((cx-37+wobble, cy+55, cx-7+wobble, cy+85), fill=(50, 185, 105, 255))
+        d.ellipse((cx+7+wobble, cy+55, cx+37+wobble, cy+85), fill=(195, 65, 65, 255))
     elif event["action"] in ("walk_down", "figure_descend", "shadow_approach", "passenger_turn"):
         x = int(265 + 26*math.sin(phase))
         draw_character(d, x, 430 + int(10*math.sin(phase*2)), 0.95, "walking")
@@ -399,9 +413,12 @@ def render_scene(event, seconds, work, index, variant_offset=0):
     run(["ffmpeg", "-y", "-framerate", str(RENDER_FPS), "-i", str(scene_dir/"frame-%04d.jpg"),
          "-vf", "fps=30,scale=1080:1920:flags=lanczos,format=yuv420p", "-an",
          "-c:v", "libx264", "-preset", "veryfast", "-crf", "18", "-r", "30", str(clip)])
-    return clip, accepted[0], {"event_id": event["event_id"], "scene": event["scene"],
+    # Compare the representative action at mid-shot, not the opening frame.
+    # Some actions (e.g. a shadow crossing) are intentionally off-screen at t=0.
+    return clip, accepted[1], {"event_id": event["event_id"], "scene": event["scene"],
         "scene_label": SCENE_NAMES.get(event["scene"], event["scene"]), "mean_frame_difference": round(score, 3),
-        "frames_checked": frame_count, "retry_count": retries, "diversity_regeneration_count": 0}
+        "diversity_sample": "midpoint", "frames_checked": frame_count,
+        "retry_count": retries, "diversity_regeneration_count": 0}
 
 def write_subtitles(events, starts, lengths, path):
     def ts(v):
@@ -605,7 +622,16 @@ def main():
         pair_diffs = [image_difference(first_frames[i], first_frames[j])
                       for i in range(len(first_frames)) for j in range(i+1, len(first_frames))]
         if any(v < 7.0 for v in pair_diffs):
-            raise RuntimeError("La diversidad entre escenas siguió por debajo del umbral tras 2 regeneraciones; render detenido.")
+            weak = []
+            for i in range(len(first_frames)):
+                for j in range(i+1, len(first_frames)):
+                    score = image_difference(first_frames[i], first_frames[j])
+                    if score < 7.0:
+                        weak.append(f"{story['events'][i]['scene']} vs {story['events'][j]['scene']}={score:.3f}")
+            raise RuntimeError(
+                "La diversidad visual entre fotogramas representativos siguió por debajo de 7.0 "
+                "tras 2 regeneraciones; render detenido. Pares: " + "; ".join(weak)
+            )
         concat_file = work/"video-scenes.txt"
         concat_file.write_text("".join(f"file '{p.resolve()}'\n" for p in clips), encoding="utf-8")
         silent_video = work/"silent-video.mp4"
