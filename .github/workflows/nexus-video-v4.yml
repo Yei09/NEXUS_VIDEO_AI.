@@ -89,7 +89,6 @@ jobs:
       PITCH_SEMITONES: ${{ inputs.pitch_semitones }}
       NARRATION_INTENSITY: ${{ inputs.narration_intensity }}
       VOICE_AUDITIONS: ${{ inputs.voice_auditions }}
-      ARTIFACT_NAME: nexus-v4-${{ inputs.request_id || github.run_id }}
     steps:
       - name: Checkout V4 branch
         uses: actions/checkout@v4
@@ -134,6 +133,8 @@ jobs:
         continue-on-error: true
         env:
           NEXUS_STATUS: processing
+          REQUEST_ID: ${{ steps.request.outputs.request_id }}
+          ARTIFACT_NAME: nexus-v4-${{ steps.request.outputs.request_id }}
           MAKE_RESULT_WEBHOOK_URL: ${{ secrets.MAKE_RESULT_WEBHOOK_URL }}
           MAKE_WEBHOOK_API_KEY: ${{ secrets.MAKE_WEBHOOK_API_KEY }}
           GITHUB_RUN_ID: ${{ github.run_id }}
@@ -144,7 +145,7 @@ jobs:
         id: render
         if: ${{ inputs.operation == 'render' }}
         env:
-          REQUEST_ID: ${{ env.REQUEST_ID }}
+          REQUEST_ID: ${{ steps.request.outputs.request_id }}
           CATEGORY: ${{ env.CATEGORY }}
           DURATION_SECONDS: ${{ env.DURATION_SECONDS }}
           PIPER_VOICE: ${{ env.PIPER_VOICE }}
@@ -159,7 +160,7 @@ jobs:
         if: ${{ inputs.operation == 'upload_only' }}
         uses: actions/download-artifact@v4
         with:
-          name: nexus-v4-${{ inputs.request_id }}
+          name: nexus-v4-${{ steps.request.outputs.request_id }}
           path: output/${{ env.REQUEST_ID }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
           repository: ${{ github.repository }}
@@ -168,8 +169,8 @@ jobs:
         if: ${{ always() }}
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ env.ARTIFACT_NAME }}
-          path: output/${{ env.REQUEST_ID }}/
+          name: nexus-v4-${{ steps.request.outputs.request_id }}
+          path: output/${{ steps.request.outputs.request_id }}/
           if-no-files-found: warn
           retention-days: 14
       - name: Notify Make that render finished
@@ -177,6 +178,8 @@ jobs:
         continue-on-error: true
         env:
           NEXUS_STATUS: rendered
+          REQUEST_ID: ${{ steps.request.outputs.request_id }}
+          ARTIFACT_NAME: nexus-v4-${{ steps.request.outputs.request_id }}
           MAKE_RESULT_WEBHOOK_URL: ${{ secrets.MAKE_RESULT_WEBHOOK_URL }}
           MAKE_WEBHOOK_API_KEY: ${{ secrets.MAKE_WEBHOOK_API_KEY }}
           GITHUB_RUN_ID: ${{ github.run_id }}
@@ -187,7 +190,7 @@ jobs:
         id: drive
         if: ${{ (inputs.operation == 'render' && steps.render.outcome == 'success') || inputs.operation == 'upload_only' }}
         env:
-          REQUEST_ID: ${{ env.REQUEST_ID }}
+          REQUEST_ID: ${{ steps.request.outputs.request_id }}
           GOOGLE_OAUTH_CLIENT_JSON: ${{ secrets.GOOGLE_OAUTH_CLIENT_JSON }}
           GOOGLE_OAUTH_REFRESH_TOKEN: ${{ secrets.GOOGLE_OAUTH_REFRESH_TOKEN }}
           GOOGLE_DRIVE_ROOT_NAME: NEXUS VIDEO AI
@@ -199,8 +202,8 @@ jobs:
         if: ${{ failure() && steps.drive.outcome == 'failure' }}
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ env.ARTIFACT_NAME }}
-          path: output/${{ env.REQUEST_ID }}/
+          name: nexus-v4-${{ steps.request.outputs.request_id }}
+          path: output/${{ steps.request.outputs.request_id }}/
           if-no-files-found: warn
           retention-days: 14
           overwrite: true
@@ -208,7 +211,9 @@ jobs:
         if: ${{ always() }}
         continue-on-error: true
         env:
-          NEXUS_STATUS: ${{ steps.drive.outcome == 'success' && 'completed' || steps.render.outcome == 'success' && 'drive_upload_failed' || inputs.operation == 'upload_only' && steps.drive.outcome == 'failure' && 'drive_upload_failed' || 'error' }}
+          NEXUS_STATUS: ${{ steps.drive.outcome == 'success' && 'completed' || steps.drive.outcome == 'failure' && 'drive_upload_failed' || 'error' }}
+          REQUEST_ID: ${{ steps.request.outputs.request_id }}
+          ARTIFACT_NAME: nexus-v4-${{ steps.request.outputs.request_id }}
           MAKE_RESULT_WEBHOOK_URL: ${{ secrets.MAKE_RESULT_WEBHOOK_URL }}
           MAKE_WEBHOOK_API_KEY: ${{ secrets.MAKE_WEBHOOK_API_KEY }}
           GITHUB_RUN_ID: ${{ github.run_id }}
