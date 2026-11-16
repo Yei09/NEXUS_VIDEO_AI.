@@ -666,6 +666,19 @@ def write_reports(out, story, events, scene_metrics, first_frames, starts, lengt
         "note": "Las métricas comparan fotogramas renderizados; la aprobación estética final requiere revisión humana."
     }
     (out/"motion_report.json").write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
+    audio_sync = {
+        "synchronization_method": "event_start_plus_fixed_0.25_second_sfx_offset",
+        "cue_offset_seconds": 0.25,
+        "cues": [
+            {"event_id": e["event_id"], "scene": e["scene"], "sfx": e["sfx"],
+             "visual_event_start_seconds": round(starts[i], 3),
+             "sound_effect_start_seconds": round(starts[i] + 0.25, 3)}
+            for i, e in enumerate(events)
+        ],
+        "audio_spatialization_claimed": False,
+        "note": "Se conserva el diseño de audio convencional existente; no se afirma audio espacial real."
+    }
+    (out/"audio_sync_report.json").write_text(json.dumps(audio_sync, ensure_ascii=False, indent=2), encoding="utf-8")
     probe = ffprobe(mp4)
     video = next((s for s in probe["streams"] if s.get("codec_type") == "video"), {})
     audio = next((s for s in probe["streams"] if s.get("codec_type") == "audio"), {})
@@ -712,7 +725,7 @@ def write_reports(out, story, events, scene_metrics, first_frames, starts, lengt
         "scene_diversity_verified": diversity_pass, "motion_verified": motion_pass,
         "files": {"video": mp4.name, "narration": narration.name, "audio_mix": audio_mix.name,
                   "story": "historia.txt", "script": "script.txt", "motion_report": "motion_report.json",
-                  "render_report": "render_report.json", "thumbnail": "thumbnail.jpg"},
+                  "render_report": "render_report.json", "audio_sync_report": "audio_sync_report.json", "thumbnail": "thumbnail.jpg"},
         "social_publishing": False, "make_status": "pending_callback", "drive_status": "pending"
     }
     (out/"metadata.json").write_text(json.dumps(metadata, ensure_ascii=False, indent=2), encoding="utf-8")
