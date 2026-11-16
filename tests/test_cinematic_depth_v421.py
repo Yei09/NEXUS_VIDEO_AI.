@@ -4,6 +4,7 @@ from PIL import Image, ImageChops, ImageDraw
 from nexus_video.cinematic_depth_v421 import (
     SceneLayer, compose_scene_layers, render_depth_scene
 )
+from nexus_video.story_v4 import STORIES
 
 
 class CinematicDepthV421Tests(unittest.TestCase):
@@ -53,6 +54,16 @@ class CinematicDepthV421Tests(unittest.TestCase):
     def test_environment_is_a_separate_layer(self):
         _, layers = render_depth_scene(self.base, {"action": "phone_ring"}, .5, 45, 90, 7019)
         self.assertIn("environment_particles", [x["name"] for x in layers])
+
+    def test_every_story_beat_has_at_least_one_independent_action_layer(self):
+        for category, stories in STORIES.items():
+            for _, _, beats in stories:
+                for scene, action, sfx, transition, text in beats:
+                    _, layers = render_depth_scene(
+                        self.base, {"scene": scene, "action": action, "sfx": sfx},
+                        .5, 45, 90, 7019
+                    )
+                    self.assertTrue(layers, f"{category}/{action} has no independent layer")
 
 
 if __name__ == "__main__":
