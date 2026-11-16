@@ -127,6 +127,7 @@ jobs:
       - name: Validate upload-only inputs
         if: ${{ inputs.operation == 'upload_only' }}
         run: |
+          test -n "${{ inputs.request_id }}" || (echo "request_id is required for upload_only" && exit 1)
           test -n "${{ inputs.source_run_id }}" || (echo "source_run_id is required for upload_only" && exit 1)
       - name: Notify Make that processing started
         if: ${{ inputs.operation == 'render' }}
@@ -190,7 +191,19 @@ jobs:
           GOOGLE_OAUTH_CLIENT_JSON: ${{ secrets.GOOGLE_OAUTH_CLIENT_JSON }}
           GOOGLE_OAUTH_REFRESH_TOKEN: ${{ secrets.GOOGLE_OAUTH_REFRESH_TOKEN }}
           GOOGLE_DRIVE_ROOT_NAME: NEXUS VIDEO AI
-        run: python -m nexus_video.drive_v4
+        run: |
+          mkdir -p "output/$REQUEST_ID/errors"
+          set -o pipefail
+          python -m nexus_video.drive_v4 2>&1 | tee "output/$REQUEST_ID/errors/drive_upload.log"
+      - name: Preserve Drive failure log in GitHub artifact
+        if: ${{ failure() && steps.drive.outcome == 'failure' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.ARTIFACT_NAME }}
+          path: output/${{ env.REQUEST_ID }}/
+          if-no-files-found: warn
+          retention-days: 14
+          overwrite: true
       - name: Send final status to Make
         if: ${{ always() }}
         continue-on-error: true
