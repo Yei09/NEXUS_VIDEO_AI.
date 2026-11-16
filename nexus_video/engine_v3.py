@@ -241,7 +241,9 @@ def main():
  clips=[]; lengths_clip=[]
  seed=20261116
  for i,event in enumerate(story["events"]):
-  clip=WORK/f"scene-{i}.mp4"; frames=WORK/f"frames-{i}"; frames.mkdir(exist_ok=True)
+  clip=WORK/f"scene-{i}.mp4"; frames=WORK/f"frames-{i}"
+  if frames.exists(): shutil.rmtree(frames)
+  frames.mkdir(parents=True,exist_ok=True)
   # Allocate scene time proportionally to speech plus its dramatic pause.
   secs=lengths[i]+pauses[i]
   count=max(30,int(math.ceil(secs*12)))
