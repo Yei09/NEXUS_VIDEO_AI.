@@ -72,7 +72,7 @@ jobs:
           set -euo pipefail
           previous="$RESUME_INPUT"
           if [[ -z "$previous" ]]; then
-            previous=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs?per_page=50" --jq "[.workflow_runs[] | select(.id != $CURRENT_RUN_ID and .head_branch == \"cinematic-reconstruction\")][0].id // empty")
+            previous=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs?per_page=50" --jq "[.workflow_runs[] | select(.id != $CURRENT_RUN_ID and .head_branch == \"cinematic-reconstruction\" and .status == \"completed\")][0].id // empty")
           fi
           if [[ -z "$previous" ]]; then
             previous="43919809063"
