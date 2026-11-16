@@ -88,7 +88,7 @@ concurrency:
   cancel-in-progress: false
 jobs:
   production:
-    if: ${{ github.ref == 'refs/heads/v4-make-drive' }}
+    if: ${{ github.event_name == 'workflow_dispatch' }}
     runs-on: ubuntu-latest
     timeout-minutes: 90
     env:
@@ -106,10 +106,26 @@ jobs:
       VOICE_AUDITIONS: ${{ inputs.voice_auditions }}
       DRIVE_CONFIGURED: ${{ secrets.GOOGLE_OAUTH_CLIENT_JSON != '' && secrets.GOOGLE_OAUTH_REFRESH_TOKEN != '' }}
     steps:
+      - name: Validate dispatch branch and print GitHub context
+        shell: bash
+        env:
+          EXPECTED_REF: refs/heads/v4-make-drive
+        run: |
+          echo "github.event_name=$GITHUB_EVENT_NAME"
+          echo "github.ref=$GITHUB_REF"
+          echo "github.ref_name=$GITHUB_REF_NAME"
+          if [[ "$GITHUB_EVENT_NAME" != "workflow_dispatch" ]]; then
+            echo "::error::This workflow only accepts manual workflow_dispatch runs."
+            exit 1
+          fi
+          if [[ "$GITHUB_REF" != "$EXPECTED_REF" ]]; then
+            echo "::error title=Wrong branch::Select v4-make-drive in the Run workflow branch selector. No production code was checked out."
+            exit 1
+          fi
       - name: Checkout V4 branch
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.ref }}
+          ref: v4-make-drive
       - name: Install FFmpeg and fonts
         run: |
           sudo apt-get update
