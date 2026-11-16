@@ -13,6 +13,9 @@ on:
         description: Optional previous Actions run ID to recover verified frames from
         required: false
         default: ""
+concurrency:
+  group: nexus-blender3d-${{ github.event.pull_request.head.ref || github.ref }}
+  cancel-in-progress: true
 jobs:
   render:
     if: ${{ github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && github.event.action == 'synchronize' && github.event.pull_request.number == 3 && github.event.pull_request.head.ref == 'cinematic-reconstruction' && github.event.pull_request.base.ref == 'cinematic-v3') }}
