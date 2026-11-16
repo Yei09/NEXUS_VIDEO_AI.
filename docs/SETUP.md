@@ -1,45 +1,45 @@
-# Configuración y prueba manual
+# Configuración y prueba de NEXUS VIDEO AI
+
+## Objetivo
+El producto genera historias originales de terror en español para Shorts, Reels y TikTok: terror psicológico, paranormal, leyendas urbanas, casas embrujadas y criaturas. Cada ejecución manual produce una historia, no una publicación.
 
 ## Seguridad predeterminada
-- Solo ejecución manual mediante workflow_dispatch. No hay schedule.
-- No se publica en TikTok, Instagram, YouTube ni otras redes.
-- El MP4 se guarda como artefacto de Actions. Drive se activa al configurar credenciales.
-- Make recibe metadatos únicamente, nunca el MP4.
-- No habilites facturación. Si Google exige tarjeta o facturación, detente.
+- Solo workflow_dispatch manual. No existe programación diaria.
+- No se publica en redes sociales.
+- No se solicita ni activa facturación.
+- Google Drive y Make son opcionales y se omiten si no están configurados.
+- No pegues claves, tokens ni contraseñas en el repositorio ni en el chat.
 
-## Google Drive
-1. Crea en Drive una carpeta llamada NEXUS VIDEO AI.
-2. En Google Cloud Console crea un proyecto sin vincular facturación.
+## Ejecutar una historia de prueba
+1. Abre Actions en GitHub.
+2. Selecciona NEXUS Video - Manual Horror Test.
+3. Pulsa Run workflow y elige la categoría.
+4. Espera a que finalice el proceso.
+5. Descarga el artefacto nexus-horror-story-test.
+6. Revisa output/metadata.json y output/script.txt incluidos en el ZIP.
+
+El motor usa Piper TTS en español, crea ilustraciones de escenas con Python/Pillow y sintetiza un ambiente de terror original con FFmpeg. Valida H.264, AAC, 1080×1920 y duración de 25–60 segundos. La duración exacta depende de la velocidad de narración y el guion; si queda fuera del rango, la ejecución falla para no entregar un vídeo que incumpla.
+
+## Google Drive (opcional)
+Para subir a Mi unidad se usa OAuth de tu cuenta:
+1. Crea una carpeta NEXUS VIDEO AI en Google Drive.
+2. En Google Cloud Console crea un proyecto sin vincular facturación y comprueba que no te solicite habilitarla.
 3. Habilita Google Drive API.
-4. Configura la pantalla de consentimiento OAuth y crea un cliente OAuth de tipo Aplicación web.
-5. En el cliente web añade https://developers.google.com/oauthplayground como URI de redirección autorizada. En Google OAuth Playground abre la configuración (icono de engranaje), activa Use your own OAuth credentials e introduce el client ID y client secret. En Step 1 usa el scope https://www.googleapis.com/auth/drive; autoriza tu cuenta y solicita un refresh token en Step 2.
-6. Copia el ID de la carpeta desde su URL.
-7. En GitHub abre Settings → Secrets and variables → Actions:
-   - Secret GOOGLE_OAUTH_CLIENT_JSON: pega el JSON del cliente OAuth.
-   - Secret GOOGLE_OAUTH_REFRESH_TOKEN: pega el refresh token.
-   - Variable GOOGLE_DRIVE_FOLDER_ID: pega el ID de la carpeta.
-8. Nunca guardes las credenciales en el repositorio, issues, commits o conversaciones.
+4. Configura consentimiento OAuth y crea un cliente OAuth web.
+5. Para OAuth Playground, añade https://developers.google.com/oauthplayground como URI de redirección autorizada. En Google OAuth Playground activa Use your own OAuth credentials y añade el client ID y client secret. Solicita el scope https://www.googleapis.com/auth/drive, autoriza tu cuenta y genera un refresh token.
+6. En GitHub → Settings → Secrets and variables → Actions configura:
+   - Secret GOOGLE_OAUTH_CLIENT_JSON: JSON del cliente OAuth.
+   - Secret GOOGLE_OAUTH_REFRESH_TOKEN: refresh token.
+   - Variable GOOGLE_DRIVE_FOLDER_ID: ID de la carpeta Drive.
+7. Ejecuta manualmente el workflow y comprueba el paso de carga y verificación.
 
-El cargador usa OAuth de tu cuenta (adecuado para Mi unidad), carga de forma reanudable y verifica el MIME type y el tamaño después de subir el archivo. Las cuentas de servicio normalmente no tienen cuota de almacenamiento en Mi unidad; se reservan como alternativa para unidades compartidas compatibles. Importante: si la pantalla OAuth queda en estado Testing para un usuario externo, Google limita el refresh token a 7 días. Para producción diaria habrá que resolver el estado/publicación OAuth antes de activar horarios; no lo activaremos en esta etapa.
+Si Google exige tarjeta o activar facturación, cancela y deja Drive pendiente. Si el consentimiento OAuth queda en Testing para un usuario externo, el refresh token puede caducar a los siete días; no habilites la programación diaria hasta resolverlo. No compartas las credenciales conmigo.
 
-## Piper TTS
-El workflow instala Piper TTS y descarga la voz española es_MX-ald-medium. Motor y modelo tienen licencias distintas; comprueba el MODEL_CARD de la voz antes de uso comercial. Se puede sustituir con PIPER_VOICE, PIPER_MODEL_URL y PIPER_CONFIG_URL en el workflow, tras verificar origen y licencia.
-
-## Ejecutar el vídeo de prueba
-1. Abre Actions.
-2. Selecciona NEXUS Video - Manual Test.
-3. Pulsa Run workflow. Usa el guion predeterminado o uno de al menos 45 palabras.
-4. Espera a que termine.
-5. Revisa el paso Render narrated MP4 y el artefacto nexus-video-manual-test.
-6. Si Drive está configurado, revisa el paso Upload and verify Google Drive y el estado uploaded_and_verified en output/metadata.json.
-
-La validación comprueba vídeo H.264, audio AAC, resolución 1080×1920 y duración de 30–60 segundos. La música ambiental de prueba se sintetiza en el propio runner con tonos originales, sin descargar pistas protegidas.
-
-## Make.com (opcional)
-Crea un escenario con Webhooks → Custom webhook. Guarda su URL como secreto MAKE_WEBHOOK_URL en GitHub Actions. El sistema enviará estado y metadatos al finalizar. No programes escenarios ni automatices disparadores todavía. La integración futura para iniciar workflows desde Make requiere un token de GitHub con permisos mínimos y quedará apagada hasta que se apruebe.
+## Make.com (opcional, solo registro)
+Crea Webhooks → Custom webhook y guarda la URL como secreto MAKE_WEBHOOK_URL en GitHub Actions. Recibirá metadatos de estado, título y enlace, nunca el MP4. Deja el escenario apagado/manual. No configures horarios ni publicación.
 
 ## Panel
-dashboard/ es un panel estático inicial. El botón abre el workflow manual en GitHub. Todavía no tiene backend, estado en vivo ni secretos conectados. No introduzcas tokens en el navegador. La futura API deberá usar un Worker y secretos privados.
+dashboard/ contiene el primer panel informativo con enlace a la prueba manual. Aún no es un panel operativo con historial vivo ni backend; no introduzcas tokens en el navegador.
 
-## Costos
-No se solicita ni habilita facturación. GitHub Actions en repositorios públicos ofrece runners estándar gratuitos según los términos y límites vigentes de GitHub. Drive utiliza el almacenamiento disponible de la cuenta. Si un proveedor solicita tarjeta o activar facturación, cancela.
+## Calidad y licencias
+Piper engine y el modelo de voz tienen licencias diferentes. Revisa el MODEL_CARD del modelo antes de uso comercial. El arte visual y los tonos ambientales de esta prueba se generan localmente; no dependen de bancos de stock ni pistas musicales con copyright. El sonido sintetizado es un ambiente básico, no una biblioteca Foley profesional.
