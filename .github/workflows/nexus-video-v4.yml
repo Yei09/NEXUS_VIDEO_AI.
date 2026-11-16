@@ -109,7 +109,7 @@ jobs:
       - name: Validate dispatch branch and print GitHub context
         shell: bash
         env:
-          EXPECTED_REF: refs/heads/v4.1-stability
+          EXPECTED_REF: refs/heads/v4.2-cinematic
         run: |
           echo "github.event_name=$GITHUB_EVENT_NAME"
           echo "github.ref=$GITHUB_REF"
@@ -119,13 +119,13 @@ jobs:
             exit 1
           fi
           if [[ "$GITHUB_REF" != "$EXPECTED_REF" ]]; then
-            echo "::error title=Wrong branch::Select v4.1-stability in the Run workflow branch selector. No production code was checked out."
+            echo "::error title=Wrong branch::Select v4.2-cinematic in the Run workflow branch selector. No production code was checked out."
             exit 1
           fi
       - name: Checkout V4 branch
         uses: actions/checkout@v4
         with:
-          ref: v4.1-stability
+          ref: v4.2-cinematic
       - name: Install FFmpeg and fonts
         run: |
           sudo apt-get update
@@ -194,9 +194,24 @@ jobs:
           GITHUB_SERVER_URL: ${{ github.server_url }}
           GITHUB_REPOSITORY: ${{ github.repository }}
         run: |
-          python -m py_compile nexus_video/story_v4.py nexus_video/engine_v4.py nexus_video/drive_v4.py nexus_video/notify_make_v4.py tests/test_story_v4.py tests/test_engine_v4.py
+          python -m py_compile nexus_video/story_v4.py nexus_video/engine_v4.py nexus_video/cinematic_v42.py nexus_video/drive_v4.py nexus_video/notify_make_v4.py tests/test_story_v4.py tests/test_engine_v4.py tests/test_cinematic_v42.py tools/compare_v41_v42.py
           python -m unittest discover -s tests -v
           python -m nexus_video.engine_v4
+      - name: Download protected V4.1 baseline artifact
+        if: ${{ inputs.operation == 'render' && steps.render.outcome == 'success' }}
+        uses: actions/download-artifact@v4
+        with:
+          name: nexus-v4-7ce296df-e7fd-41ad-8dcc-a09ef98d63d3
+          path: baseline-v4.1
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          repository: ${{ github.repository }}
+          run-id: 43819913441
+      - name: Compare six encoded scenes against V4.1
+        if: ${{ inputs.operation == 'render' && steps.render.outcome == 'success' }}
+        run: |
+          python tools/compare_v41_v42.py baseline-v4.1 output/$REQUEST_ID output/$REQUEST_ID/comparison
+          test -s output/$REQUEST_ID/comparison/comparison_report.json
+          test -s output/$REQUEST_ID/comparison/v4.1-vs-v4.2-contact-sheet.jpg
       - name: Verify rendered MP4 and audio deliverables
         if: ${{ inputs.operation == 'render' }}
         shell: bash
