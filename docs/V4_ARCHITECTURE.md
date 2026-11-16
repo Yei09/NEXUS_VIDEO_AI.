@@ -90,7 +90,7 @@ GitHub Actions devuelve HTTP 204 a la llamada REST de workflow dispatch. No devu
 
 Webhook: NEXUS_V4_GENERATION_CALLBACK.
 
-Cada evento lleva schema_version, event=generation.status, request_id, status, run_id, run_url, artifact_name, updated_at y metadata. Los estados reportados incluyen processing, rendered, completed y drive_upload_failed. Make normaliza drive_upload_failed como status=error y conserva stage=drive_upload_failed para permitir el reintento de carga.
+Cada evento lleva schema_version, event=generation.status, request_id, status, run_id, run_url, artifact_name, updated_at y metadata. Los estados reportados incluyen processing, story_created, narrating, scenes_rendering, audio_mixing, rendered, uploading_drive, completed y drive_upload_failed. Los eventos intermedios mantienen status=processing y actualizan stage. Make normaliza drive_upload_failed como status=error y conserva stage=drive_upload_failed para permitir el reintento de carga.
 
 El callback usa el encabezado x-make-apikey; la clave no está en el repositorio. Make valida la clave en el propio Custom webhook.
 
