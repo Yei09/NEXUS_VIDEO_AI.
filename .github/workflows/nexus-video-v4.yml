@@ -51,6 +51,16 @@ on:
         type: string
         required: true
         default: "-1.0"
+      voice_volume:
+        description: Narration output volume (0.5-1.5)
+        type: string
+        required: true
+        default: "1.0"
+      pause_seconds:
+        description: Pause between story beats in seconds (0.2-1.5)
+        type: string
+        required: true
+        default: "0.78"
       narration_intensity:
         description: Narration and sound-design intensity
         type: choice
@@ -87,6 +97,8 @@ jobs:
       PIPER_VOICE: ${{ inputs.voice }}
       VOICE_RATE: ${{ inputs.voice_rate }}
       PITCH_SEMITONES: ${{ inputs.pitch_semitones }}
+      VOICE_VOLUME: ${{ inputs.voice_volume }}
+      PAUSE_SECONDS: ${{ inputs.pause_seconds }}
       NARRATION_INTENSITY: ${{ inputs.narration_intensity }}
       VOICE_AUDITIONS: ${{ inputs.voice_auditions }}
     steps:
@@ -151,6 +163,8 @@ jobs:
           PIPER_VOICE: ${{ env.PIPER_VOICE }}
           VOICE_RATE: ${{ env.VOICE_RATE }}
           PITCH_SEMITONES: ${{ env.PITCH_SEMITONES }}
+          VOICE_VOLUME: ${{ env.VOICE_VOLUME }}
+          PAUSE_SECONDS: ${{ env.PAUSE_SECONDS }}
           NARRATION_INTENSITY: ${{ env.NARRATION_INTENSITY }}
           VOICE_AUDITIONS: ${{ env.VOICE_AUDITIONS }}
         run: |
