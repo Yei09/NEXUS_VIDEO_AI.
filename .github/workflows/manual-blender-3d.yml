@@ -1,8 +1,5 @@
 name: NEXUS Blender 3D prototype (manual and PR sync)
 on:
-  pull_request:
-    branches: [cinematic-v3]
-    types: [synchronize]
   workflow_dispatch:
     inputs:
       samples:
