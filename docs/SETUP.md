@@ -11,8 +11,8 @@
 1. Crea en Drive una carpeta llamada NEXUS VIDEO AI.
 2. En Google Cloud Console crea un proyecto sin vincular facturación.
 3. Habilita Google Drive API.
-4. Configura la pantalla de consentimiento OAuth y crea un cliente OAuth de tipo Desktop.
-5. Para obtener el refresh token, configura el redirect URI https://developers.google.com/oauthplayground en el cliente OAuth y usa Google OAuth Playground con el scope https://www.googleapis.com/auth/drive. Autoriza tu cuenta y solicita un refresh token.
+4. Configura la pantalla de consentimiento OAuth y crea un cliente OAuth de tipo Aplicación web.
+5. En el cliente web añade https://developers.google.com/oauthplayground como URI de redirección autorizada. En Google OAuth Playground abre la configuración (icono de engranaje), activa Use your own OAuth credentials e introduce el client ID y client secret. En Step 1 usa el scope https://www.googleapis.com/auth/drive; autoriza tu cuenta y solicita un refresh token en Step 2.
 6. Copia el ID de la carpeta desde su URL.
 7. En GitHub abre Settings → Secrets and variables → Actions:
    - Secret GOOGLE_OAUTH_CLIENT_JSON: pega el JSON del cliente OAuth.
@@ -20,7 +20,7 @@
    - Variable GOOGLE_DRIVE_FOLDER_ID: pega el ID de la carpeta.
 8. Nunca guardes las credenciales en el repositorio, issues, commits o conversaciones.
 
-El cargador usa OAuth de tu cuenta (adecuado para Mi unidad), carga de forma reanudable y verifica el MIME type y el tamaño después de subir el archivo. Las cuentas de servicio normalmente no tienen cuota de almacenamiento en Mi unidad; se reservan como alternativa para unidades compartidas compatibles.
+El cargador usa OAuth de tu cuenta (adecuado para Mi unidad), carga de forma reanudable y verifica el MIME type y el tamaño después de subir el archivo. Las cuentas de servicio normalmente no tienen cuota de almacenamiento en Mi unidad; se reservan como alternativa para unidades compartidas compatibles. Importante: si la pantalla OAuth queda en estado Testing para un usuario externo, Google limita el refresh token a 7 días. Para producción diaria habrá que resolver el estado/publicación OAuth antes de activar horarios; no lo activaremos en esta etapa.
 
 ## Piper TTS
 El workflow instala Piper TTS y descarga la voz española es_MX-ald-medium. Motor y modelo tienen licencias distintas; comprueba el MODEL_CARD de la voz antes de uso comercial. Se puede sustituir con PIPER_VOICE, PIPER_MODEL_URL y PIPER_CONFIG_URL en el workflow, tras verificar origen y licencia.
