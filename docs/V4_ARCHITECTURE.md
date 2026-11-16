@@ -24,6 +24,8 @@ La implementación añade:
 | voice | choice | cuatro modelos Piper enumerados en el workflow |
 | voice_rate | string | 0.75–1.25 |
 | pitch_semitones | string | -2.0 a 2.0 |
+| voice_volume | string | 0.5–1.5 |
+| pause_seconds | string | 0.2–1.5 |
 | narration_intensity | choice | calm, mysterious, urgent |
 | voice_auditions | boolean | true / false |
 | source_run_id | string | obligatorio solo para upload_only |
@@ -44,6 +46,8 @@ Webhook: NEXUS_V4_GENERATION_REQUEST.
       "voice": "es_MX-claude-high",
       "voice_rate": 1.0,
       "pitch_semitones": -1.0,
+      "voice_volume": 1.0,
+      "pause_seconds": 0.78,
       "narration_intensity": "mysterious",
       "voice_auditions": false
     }
@@ -61,6 +65,8 @@ Para reintentar únicamente Drive, sin renderizar otra vez:
       "voice": "es_MX-claude-high",
       "voice_rate": 1.0,
       "pitch_semitones": -1.0,
+      "voice_volume": 1.0,
+      "pause_seconds": 0.78,
       "narration_intensity": "mysterious",
       "voice_auditions": false
     }
