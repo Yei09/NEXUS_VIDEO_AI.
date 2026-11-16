@@ -15,7 +15,9 @@ def box(name,loc,dim,ma,bevel=0):
 def key(obj,path,values,index=None):
  for f,v in values:
   if index is None: setattr(obj,path,v)
-  else: getattr(obj,path)[index]=v
+  else:
+   component = v[index] if isinstance(v,(tuple,list)) else v
+   getattr(obj,path)[index]=component
   obj.keyframe_insert(data_path=path,index=index,frame=f)
 def build():
  bpy.ops.object.select_all(action="SELECT"); bpy.ops.object.delete(use_global=False)
@@ -85,9 +87,9 @@ def build():
  for i in range(18):
   bpy.ops.mesh.primitive_uv_sphere_add(segments=8,ring_count=4,radius=.018,location=((i%5-2)*.7,-3+(i%7)*1.4,1+(i%4)*.5)); p=bpy.context.object; p.name="dust_particle"; p.data.materials.append(dust); p.keyframe_insert(data_path="location",frame=1); p.location.z+=.5; p.keyframe_insert(data_path="location",frame=300)
  os.makedirs(OUT,exist_ok=True); s.render.filepath=os.path.join(OUT,"frame_"); s.render.image_settings.file_format="PNG"
- # Explicit linear interpolation for smooth deterministic movement.
+ # Blender 5 uses layered Actions; preserve Blender's default BEZIER interpolation when legacy fcurves are unavailable.
  for obj in s.objects:
-  if obj.animation_data and obj.animation_data.action:
+  if obj.animation_data and obj.animation_data.action and hasattr(obj.animation_data.action,"fcurves"):
    for fc in obj.animation_data.action.fcurves:
     for kp in fc.keyframe_points: kp.interpolation="BEZIER"
  s.frame_set(1); bpy.ops.wm.save_as_mainfile(filepath=os.path.join(os.path.dirname(OUT),"scene.blend"))
@@ -99,6 +101,9 @@ def build():
  prep_seconds=time.perf_counter()-BUILD_STARTED
  timing_path=os.path.join(os.path.dirname(OUT),"blender_timing.json")
  with open(timing_path,"w") as f: json.dump({"preparation_seconds":round(prep_seconds,3)},f)
- render_started=time.perf_counter(); bpy.ops.render.render(animation=True)
- with open(timing_path,"w") as f: json.dump({"preparation_seconds":round(prep_seconds,3),"render_seconds":round(time.perf_counter()-render_started,3)},f)
+ if os.environ.get("NEXUS_BUILD_ONLY","0") == "1":
+  print("NEXUS_BUILD_ONLY: scene saved; frame rendering delegated to resumable block runner")
+ else:
+  render_started=time.perf_counter(); bpy.ops.render.render(animation=True)
+  with open(timing_path,"w") as f: json.dump({"preparation_seconds":round(prep_seconds,3),"render_seconds":round(time.perf_counter()-render_started,3)},f)
 build()
