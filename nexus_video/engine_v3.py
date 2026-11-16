@@ -1,5 +1,5 @@
 from __future__ import annotations
-import json, math, os, random, shutil, subprocess, sys, urllib.request, wave
+import json, math, os, random, shutil, subprocess, sys, urllib.request, wave, textwrap
 from datetime import datetime, timezone
 from pathlib import Path
 from PIL import Image, ImageDraw, ImageFilter, ImageChops, ImageStat
@@ -46,7 +46,11 @@ def download_voice(v):
  return model,cfg
 def piper(text,voice,out):
  model,cfg=download_voice(voice)
- run(["piper","--model",str(model),"--config",str(cfg),"--length_scale","1.12","--noise_scale","0.68","--noise_w","0.78","--output_file",str(out)],text)
+ raw=out.with_name(out.stem+"-raw.wav")
+ run(["piper","--model",str(model),"--config",str(cfg),"--length_scale","1.12","--noise_scale","0.68","--noise_w","0.78","--output_file",str(raw)],text)
+ # Apply the same subtle pitch reduction to auditions and final narration.
+ run(["ffmpeg","-y","-i",str(raw),"-af","asetrate=22050*0.96,aresample=22050,atempo=1.0416667","-c:a","pcm_s16le",str(out)])
+ raw.unlink(missing_ok=True)
  return out
 def duration(path):
  return float(run(["ffprobe","-v","error","-show_entries","format=duration","-of","default=noprint_wrappers=1:nokey=1",str(path)]))
@@ -192,7 +196,8 @@ Format: Layer,Start,End,Style,Name,MarginL,MarginR,MarginV,Effect,Text
 """
  lines=[header]; cursor=0
  for ev,secs in zip(events,lengths):
-  lines.append(f"Dialogue: 0,{ts(cursor)},{ts(cursor+secs)},Default,,0,0,0,,{ev['text']}\n")
+  caption=r"\N".join(textwrap.wrap(ev["text"],width=46,break_long_words=False,break_on_hyphens=False))
+  lines.append(f"Dialogue: 0,{ts(cursor)},{ts(cursor+secs)},Default,,0,0,0,,{caption}\n")
   cursor+=secs
  path.write_text("".join(lines),encoding="utf-8")
 def main():
@@ -299,7 +304,7 @@ def main():
    distinct.append(round(delta,3))
  if any(x<8.0 for x in distinct): raise RuntimeError("Dos escenas son demasiado similares; se detiene la entrega.")
  (OUT/"motion_report.json").write_text(json.dumps({"motion":motion,"pairwise_scene_difference":distinct,"motion_pass":True,"scene_diversity_pass":True},indent=2),encoding="utf-8")
- meta={"status":"rendered","version":"cinematic-v3","created_at":datetime.now(timezone.utc).isoformat(),"title":story["title"],"genre":story["genre"],"events":story["events"],"voice":voice_id,"voice_auditions":[v["id"] for v in VOICES],"narration_file":"narration.wav","video_file":mp4.name,"duration_seconds":round(secs,2),"width":1080,"height":1920,"fps":30,"video_codec":"h264","audio_codec":"aac","scene_count":len(clips),"motion_report":"motion_report.json","motion_verified":True,"scene_diversity_verified":True,"scene_types":[e["scene"] for e in story["events"]],"animation":"12 fps generated scene frames with moving props, silhouettes, fog, particles, flicker and impact shake; encoded at 30 fps","sound_design":"event-timed synthesized cues, low drone and wind; narration mixed separately","social_publishing":False,"make_connected":False,"google_drive_connected":False}
+ meta={"status":"rendered","version":"cinematic-v3","created_at":datetime.now(timezone.utc).isoformat(),"title":story["title"],"genre":story["genre"],"events":story["events"],"voice":voice_id,"voice_auditions":[v["id"] for v in VOICES],"narration_file":"narration.wav","video_file":mp4.name,"duration_seconds":round(secs,2),"width":1080,"height":1920,"fps":30,"video_codec":"h264","audio_codec":"aac","scene_count":len(clips),"motion_report":"motion_report.json","motion_verified":True,"scene_diversity_verified":True,"scene_types":[e["scene"] for e in story["events"]],"animation":"12 fps generated scene frames with moving props, silhouettes, fog, particles, flicker and impact shake; encoded at 30 fps","voice_processing":"pitch_down_0.7_semitone_with_duration_restored","sound_design":"event-timed synthesized cues, low drone and wind; narration mixed separately","social_publishing":False,"make_connected":False,"google_drive_connected":False}
  (OUT/"metadata.json").write_text(json.dumps(meta,ensure_ascii=False,indent=2),encoding="utf-8")
  (OUT/"script.txt").write_text("\n".join(e["text"] for e in story["events"]),encoding="utf-8")
  print(json.dumps(meta,ensure_ascii=False,indent=2))
