@@ -10,14 +10,14 @@ La prueba usa seis acontecimientos distintos: plano general del teléfono, escal
 
 ## Voces Piper incluidas para audición
 
-Las cuatro muestras usan exactamente el mismo texto. Los archivos WAV se generan por separado en output/voice-samples/.
+Las cuatro muestras usan exactamente el mismo texto y el mismo procesamiento de tono. En Sharvard se fuerza speaker 0 (masculino) para que la comparación no mezcle voces. Los archivos WAV se generan por separado en output/voice-samples/.
 
 | Modelo | Acento | Nivel de modelo | Nota de licencia del modelo |
 |---|---|---:|---|
 | es_MX-claude-high | México | high | Apache-2.0 |
 | es_MX-ald-medium | México | medium | Unlicense |
 | es_ES-davefx-medium | España | medium | CC0 según su ficha de modelo |
-| es_ES-sharvard-medium | España | medium | CC BY 3.0; requiere atribución |
+| es_ES-sharvard-medium | España | medium | CC BY 3.0; speaker 0 masculino, speaker 1 femenino; requiere atribución |
 
 “High” y “medium” describen el tamaño/calidad de distribución del modelo, no garantizan una voz más grave, masculina o más natural. El catálogo oficial enumera idioma, modelo y nivel, pero no ofrece una clasificación fiable de profundidad vocal. La elección final queda pendiente de escuchar las muestras. No se aprueba ninguna voz automáticamente.
 
