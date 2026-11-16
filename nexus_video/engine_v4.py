@@ -563,12 +563,20 @@ def render_scene(event, seconds, work, index, variant_offset=0):
     accepted = None
     score = 0.0
     retries = 0
+    layer_motion_samples = []
     for attempt in range(3):
         for old in scene_dir.glob("frame-*.jpg"):
             old.unlink()
         seed = 7019 + index*997 + attempt*137 + variant_offset*1009
+        layer_motion_samples = []
+        sample_frames = {0, frame_count//2, frame_count-1}
         for n in range(frame_count):
             frame = render_frame(event, n/max(1, frame_count-1), n, frame_count, seed)
+            if n in sample_frames:
+                layer_motion_samples.append({
+                    "frame": n, "progress": round(n/max(1, frame_count-1), 4),
+                    "layers": getattr(render_frame, "last_layer_manifest", [])
+                })
             frame.save(scene_dir/f"frame-{n:04d}.jpg", quality=88)
         first = Image.open(scene_dir/"frame-0000.jpg").convert("RGB")
         middle = Image.open(scene_dir/f"frame-{frame_count//2:04d}.jpg").convert("RGB")
@@ -590,6 +598,7 @@ def render_scene(event, seconds, work, index, variant_offset=0):
         "diversity_sample": "midpoint", "frames_checked": frame_count,
         "retry_count": retries, "diversity_regeneration_count": 0,
         "independent_layers": getattr(render_frame, "last_layer_manifest", []),
+        "independent_layer_motion_samples": layer_motion_samples,
         "depth_compositor": "v4.2.1-independent-overlay-layers"}
 
 def extract_representative_frames(mp4, out, events, starts, scene_durations):
