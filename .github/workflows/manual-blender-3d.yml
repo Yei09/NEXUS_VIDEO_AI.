@@ -23,21 +23,23 @@ jobs:
           set -euo pipefail
           start=$(date +%s)
           sudo apt-get update
-          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y blender ffmpeg espeak-ng python3-opencv
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y blender ffmpeg espeak-ng
           end=$(date +%s)
           echo "seconds=$((end-start))" >> "$GITHUB_OUTPUT"
           blender --version | head -n 2
           ffmpeg -version | head -n 1
       - name: Install Python validation dependencies
-        run: python -m pip install --user numpy opencv-python-headless
+        run: |
+          python -m venv .venv
+          .venv/bin/pip install numpy opencv-python-headless
       - name: Render 10-second 3D scene on CPU
         env:
           NEXUS_INSTALL_SECONDS: ${{ steps.install.outputs.seconds }}
         run: |
-          python tools/render_3d_prototype.py --out artifacts/blender3d --samples "${{ inputs.samples }}"
+          .venv/bin/python tools/render_3d_prototype.py --out artifacts/blender3d --samples "${{ inputs.samples }}"
       - name: Validate MP4 and visible motion
         run: |
-          python tools/validate_3d_prototype.py artifacts/blender3d
+          .venv/bin/python tools/validate_3d_prototype.py artifacts/blender3d
           ffprobe -v error -show_streams -show_format artifacts/blender3d/nexus_blender3d_10s.mp4 > artifacts/blender3d/ffprobe.json
           free -h > artifacts/blender3d/memory_snapshot.txt
           du -ah artifacts/blender3d | sort -h > artifacts/blender3d/file_sizes.txt
