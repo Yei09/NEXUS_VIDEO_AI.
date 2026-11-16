@@ -8,7 +8,7 @@ Rama de trabajo: v4-make-drive (creada desde cinematic-v3).
 
 Esta rama incorpora el motor V4, un workflow manual, un cargador de Google Drive con OAuth y verificación, callbacks de Make y contratos/documentación para los escenarios y el futuro panel.
 
-**Todavía no se ha ejecutado una generación V4 ni se ha conectado una cuenta Make o Google Drive.** La integración requiere secretos y escenarios creados por el propietario. Además, GitHub exige que el workflow_dispatch exista en la rama predeterminada antes de aceptar despachos API; el workflow de V4 está en esta rama y no se fusionará a main sin autorización.
+**Todavía no se ha ejecutado una generación V4 ni se ha conectado una cuenta Make o Google Drive.** La integración requiere secretos y escenarios creados por el propietario. Además, GitHub exige que el workflow_dispatch exista en la rama predeterminada antes de aceptar despachos API. El PR #2 separado propone añadir solo el workflow a main; sigue en borrador y requiere autorización. El código V4 continúa en v4-make-drive.
 
 ## Capacidades implementadas en código
 
