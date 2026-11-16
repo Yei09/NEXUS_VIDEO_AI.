@@ -136,4 +136,4 @@ El panel debe llamar a estos webhooks desde un backend/proxy propio; no expongas
 
 ## Bloqueo actual de workflow_dispatch
 
-La documentación oficial de GitHub establece que workflow_dispatch solo recibe eventos si el archivo workflow está en la rama predeterminada. El archivo V4 está, por ahora, solo en v4-make-drive. Make no podrá lanzar esta rama hasta que el workflow se apruebe y se integre en main (o se cambie la rama predeterminada con autorización). No hagas el despacho de prueba antes de resolver este punto.
+La documentación oficial de GitHub establece que workflow_dispatch solo recibe eventos si el archivo workflow está en la rama predeterminada. El workflow V4 está en v4-make-drive. El PR #2 (v4-workflow-bootstrap) propone agregar únicamente ese archivo a main; no está fusionado. Make no podrá lanzar la rama hasta que el propietario apruebe y fusione ese PR. El workflow tiene una guarda para ejecutar solo el ref v4-make-drive. No hagas el despacho de prueba antes de resolver este punto.
