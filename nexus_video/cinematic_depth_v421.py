@@ -201,5 +201,7 @@ def render_depth_scene(base_image, event, t, frame_no, total_frames, seed):
     focus_depth=.78 if event.get("action") in {"phone_ring","receiver_lift","screen_call","door_open","cable_crawl"} else .58
     return compose_scene_layers(base_image,layers,camera_target=target,focus_depth=focus_depth), [
         {"name":x.name,"depth":round(x.depth,3),"independent_transform":True,
+         "position":[round(x.x,2),round(x.y,2)],"scale":round(x.scale,3),
+         "rotation_degrees":round(x.rotation,3),"alpha_bounds":list(x.image.getbbox() or ()),
          "camera_weight":x.camera_weight,"blur":x.blur} for x in layers
     ]
