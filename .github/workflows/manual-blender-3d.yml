@@ -1,18 +1,26 @@
-name: NEXUS Blender 3D prototype (manual and PR sync)
+name: NEXUS Blender 3D prototype (recoverable block render)
 on:
+  pull_request:
+    branches: [cinematic-v3]
+    types: [synchronize]
   workflow_dispatch:
     inputs:
       samples:
-        description: Cycles CPU samples (keep low on free runners)
+        description: Cycles CPU samples (8 preserves current visual quality)
         required: true
         default: "8"
+      resume_run_id:
+        description: Optional previous Actions run ID to recover verified frames from
+        required: false
+        default: ""
 jobs:
   render:
     if: ${{ github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && github.event.action == 'synchronize' && github.event.pull_request.number == 3 && github.event.pull_request.head.ref == 'cinematic-reconstruction' && github.event.pull_request.base.ref == 'cinematic-v3') }}
     runs-on: ubuntu-latest
-    timeout-minutes: 90
+    timeout-minutes: 360
     permissions:
       contents: read
+      actions: read
     steps:
       - name: Verify event and exact source commit
         shell: bash
@@ -53,7 +61,35 @@ jobs:
           [[ "$actual" == "$SOURCE_SHA" ]]
           echo "CHECKED_OUT_SHA=$actual"
           git status --short
-      - name: Measure dependency installation
+      - name: Find previous checkpoint run
+        id: resume
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CURRENT_RUN_ID: ${{ github.run_id }}
+          RESUME_INPUT: ${{ inputs.resume_run_id || '' }}
+        run: |
+          set -euo pipefail
+          previous="$RESUME_INPUT"
+          if [[ -z "$previous" ]]; then
+            previous=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs?per_page=50" --jq "[.workflow_runs[] | select(.id != $CURRENT_RUN_ID and .head_branch == \"cinematic-reconstruction\")][0].id // empty")
+          fi
+          if [[ -z "$previous" ]]; then
+            previous="43919809063"
+          fi
+          echo "run_id=$previous" >> "$GITHUB_OUTPUT"
+          echo "Checkpoint source run: $previous"
+      - name: Download previous frame checkpoint artifact
+        id: restore
+        continue-on-error: true
+        uses: actions/download-artifact@v4
+        with:
+          pattern: nexus-blender3d-*
+          merge-multiple: true
+          run-id: ${{ steps.resume.outputs.run_id }}
+          github-token: ${{ github.token }}
+          path: artifacts/resume
+      - name: Install Blender, FFmpeg and speech tools
         id: install
         shell: bash
         run: |
@@ -69,77 +105,30 @@ jobs:
         run: |
           python -m venv .venv
           .venv/bin/pip install numpy opencv-python-headless
-      - name: Apply runner-local Euler keyframe correction and preserve source
-        shell: bash
+      - name: Record memory before render
         run: |
-          set -euo pipefail
           mkdir -p artifacts/blender3d
-          python - <<'PY'
-          from pathlib import Path
-          import hashlib, json
-          path = Path("nexus_video3d/scene_factory.py")
-          source = path.read_text(encoding="utf-8")
-          backup = Path("artifacts/blender3d/scene_factory_source.py")
-          backup.write_text(source, encoding="utf-8")
-          old = '''def key(obj,path,values,index=None):
-           for f,v in values:
-            if index is None: setattr(obj,path,v)
-            else: getattr(obj,path)[index]=v
-            obj.keyframe_insert(data_path=path,index=index,frame=f)
-          '''
-          new = '''def key(obj,path,values,index=None):
-           for f,v in values:
-            if index is None: setattr(obj,path,v)
-            else:
-             component = v[index] if isinstance(v,(tuple,list)) else v
-             getattr(obj,path)[index]=component
-            obj.keyframe_insert(data_path=path,index=index,frame=f)
-          '''
-          if old not in source:
-              raise SystemExit("Expected Euler helper source not found; refusing an unverified patch")
-          patched = source.replace(old, new, 1)
-          old_curves = ''' # Explicit linear interpolation for smooth deterministic movement.
-           for obj in s.objects:
-            if obj.animation_data and obj.animation_data.action:
-             for fc in obj.animation_data.action.fcurves:
-              for kp in fc.keyframe_points: kp.interpolation="BEZIER"
-          '''
-          new_curves = ''' # Blender 5 uses layered Actions; retain default BEZIER interpolation when legacy fcurves are unavailable.
-           for obj in s.objects:
-            if obj.animation_data and obj.animation_data.action and hasattr(obj.animation_data.action, "fcurves"):
-             for fc in obj.animation_data.action.fcurves:
-              for kp in fc.keyframe_points: kp.interpolation="BEZIER"
-          '''
-          if old_curves not in patched:
-              raise SystemExit("Expected legacy Action.fcurves block not found; refusing an unverified compatibility patch")
-          patched = patched.replace(old_curves, new_curves, 1)
-          path.write_text(patched, encoding="utf-8")
-          report = {
-              "patch": "runner_local_euler_and_blender5_action_compatibility",
-              "reason": "Select the Z component for hinge Euler keyframes and guard legacy Action.fcurves access on Blender 5 layered Actions.",
-              "source_sha256": hashlib.sha256(source.encode()).hexdigest(),
-              "runtime_sha256": hashlib.sha256(patched.encode()).hexdigest(),
-              "repository_files_modified": False
-          }
-          Path("artifacts/blender3d/runtime_patch_report.json").write_text(json.dumps(report, indent=2), encoding="utf-8")
-          print(json.dumps(report, indent=2))
-          PY
-      - name: Render 10-second 3D scene on CPU
+          free -h > artifacts/blender3d/memory_before.txt
+      - name: Render verified 30-frame blocks and resume missing frames
         env:
           NEXUS_INSTALL_SECONDS: ${{ steps.install.outputs.seconds }}
         run: |
-          .venv/bin/python tools/render_3d_prototype.py --out artifacts/blender3d --samples "${{ inputs.samples || '8' }}"
-      - name: Validate MP4 and visible motion
+          .venv/bin/python tools/render_3d_resumable.py \
+            --out artifacts/blender3d \
+            --samples "${{ inputs.samples || '8' }}" \
+            --block-size 30 \
+            --resume artifacts/resume
+      - name: Validate complete MP4 and visible 3D motion
         run: |
           .venv/bin/python tools/validate_3d_prototype.py artifacts/blender3d
-          ffprobe -v error -show_streams -show_format artifacts/blender3d/nexus_blender3d_10s.mp4 > artifacts/blender3d/ffprobe.json
-          free -h > artifacts/blender3d/memory_snapshot.txt
+          ffprobe -v error -show_streams -show_format artifacts/blender3d/nexus_blender3d_10s.mp4 > artifacts/blender3d/ffprobe_validation.json
+          free -h > artifacts/blender3d/memory_after.txt
           du -ah artifacts/blender3d | sort -h > artifacts/blender3d/file_sizes.txt
-      - name: Upload authentic render and evidence
+      - name: Upload render, checkpoints, logs and evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: nexus-blender3d-prototype-${{ github.run_number }}
+          name: nexus-blender3d-recovery-${{ github.run_number }}
           path: artifacts/blender3d/
           if-no-files-found: warn
           retention-days: 14
