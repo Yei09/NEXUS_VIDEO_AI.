@@ -54,6 +54,8 @@ El panel debe ofrecer controles para:
 - Voz: cuatro IDs Piper aceptados por el workflow.
 - Velocidad: 0.75–1.25.
 - Tono: -2.0 a +2.0 semitonos.
+- Volumen de narración: 0.5–1.5.
+- Pausas entre acontecimientos: 0.2–1.5 segundos.
 - Intensidad: calm, mysterious, urgent.
 - Audiciones de voz: true/false.
 
