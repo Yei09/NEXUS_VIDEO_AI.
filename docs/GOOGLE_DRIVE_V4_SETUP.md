@@ -2,7 +2,7 @@
 
 ## Método elegido
 
-V4 usa Google Drive API v3 con OAuth 2.0 de usuario y refresh token. No usa una cuenta de servicio: para guardar en tu Mi unidad, el usuario debe autorizar el acceso. El código solicita únicamente el scope drive.file. Con ese alcance, NEXUS crea su propia carpeta raíz y administra los archivos que crea dentro de ella; no necesita leer ni modificar todo tu Drive.
+V4 usa Google Drive API v3 con OAuth 2.0 de usuario y refresh token. No usa una cuenta de servicio: para guardar en tu Mi unidad, el usuario debe autorizar el acceso. El código solicita únicamente el scope drive.file. Con ese alcance, NEXUS crea su propia carpeta raíz y administra los archivos que crea dentro de ella; no necesita leer ni modificar todo tu Drive. Si ya existe una carpeta homónima creada manualmente, el scope drive.file podría no verla y se crearía una raíz adicional de NEXUS VIDEO AI; el motor no intenta acceder a carpetas ajenas a la app.
 
 La subida usa carga reanudable (resumable) y después consulta cada archivo para comprobar tamaño y, cuando Drive devuelve el campo, MD5. Los reintentos de carga no vuelven a renderizar el vídeo.
 
