@@ -47,7 +47,7 @@ def download_voice(v):
 def piper(text,voice,out):
  model,cfg=download_voice(voice)
  raw=out.with_name(out.stem+"-raw.wav")
- run(["piper","--model",str(model),"--config",str(cfg),"--length_scale","1.12","--noise_scale","0.68","--noise_w","0.78","--output_file",str(raw)],text)
+ run(["piper","--model",str(model),"--config",str(cfg),"--speaker","0","--length_scale","1.12","--noise_scale","0.68","--noise_w","0.78","--output_file",str(raw)],text)
  # Apply the same subtle pitch reduction to auditions and final narration.
  run(["ffmpeg","-y","-i",str(raw),"-af","asetrate=22050*0.96,aresample=22050,atempo=1.0416667","-c:a","pcm_s16le",str(out)])
  raw.unlink(missing_ok=True)
@@ -210,7 +210,7 @@ def main():
  voice_id=os.getenv("PIPER_VOICE","es_MX-claude-high")
  voice=next((v for v in VOICES if v["id"]==voice_id),None)
  if not voice: raise RuntimeError("Voz principal no reconocida: "+voice_id)
- # Generate four comparable, unprocessed voice auditions for user approval.
+ # Generate four comparable auditions with identical subtle pitch processing for user approval.
  sample_dir=OUT/"voice-samples"; sample_dir.mkdir(exist_ok=True)
  for v in VOICES:
   piper(SAMPLE_TEXT,v,sample_dir/(v["id"]+".wav"))
