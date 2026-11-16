@@ -21,6 +21,10 @@ def send(status=None, extra=None):
     run_url = ""
     if os.getenv("GITHUB_SERVER_URL") and os.getenv("GITHUB_REPOSITORY") and run_id:
         run_url = f"{os.environ['GITHUB_SERVER_URL']}/{os.environ['GITHUB_REPOSITORY']}/actions/runs/{run_id}"
+    error_log = out / "errors" / "drive_upload.log"
+    error_text = error_log.read_text(encoding="utf-8", errors="replace")[-3000:] if error_log.exists() else ""
+    manifest_path = out / "drive_manifest.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8")) if manifest_path.exists() else {}
     payload = {
         "schema_version": "1.0",
         "event": "generation.status",
@@ -33,7 +37,7 @@ def send(status=None, extra=None):
         "artifact_name": os.getenv("ARTIFACT_NAME", ""),
         "updated_at": datetime.now(timezone.utc).isoformat(),
         "metadata": metadata,
-        "extra": extra or {},
+        "extra": extra or {"error_log_tail": error_text, "drive_manifest": manifest},
         "social_publishing": False
     }
     body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
