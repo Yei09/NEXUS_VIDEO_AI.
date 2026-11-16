@@ -34,6 +34,8 @@ def send(status=None, extra=None):
         "project": "NEXUS VIDEO AI",
         "version": "V4",
         "request_id": request_id,
+        "operation": os.getenv("OPERATION", "render"),
+        "source_run_id": os.getenv("SOURCE_RUN_ID", "") or (run_id if os.getenv("OPERATION", "render") == "render" else ""),
         "status": status or os.getenv("NEXUS_STATUS", "unknown"),
         "run_id": run_id,
         "run_url": run_url,
