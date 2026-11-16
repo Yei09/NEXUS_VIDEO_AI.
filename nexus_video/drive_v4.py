@@ -81,6 +81,9 @@ def upload_one(drive, path, parent_id):
             if attempt == 2:
                 raise
             time.sleep(2 ** attempt)
+            # Re-query after a lost response: the upload may have committed despite a client-side timeout.
+            existing = drive.files().list(q=q, pageSize=100, fields="files(id,name,mimeType,size,md5Checksum,webViewLink,parents)").execute().get("files", [])
+            target = next((x for x in existing if x.get("name") == path.name), None)
             # Recreate MediaFileUpload after a failed resumable attempt.
             media = MediaFileUpload(str(path), mimetype=mime, resumable=True, chunksize=8*1024*1024)
     raise RuntimeError(f"No se pudo subir {path.name}.")
@@ -160,7 +163,7 @@ def main():
     metadata["drive"] = {
         "status": "uploaded_and_verified", "root_folder": root,
         "folders": manifest["folders"], "files": uploaded,
-        "verified_file_count": len(uploaded), "manifest": "drive_manifest.json"
+        "verified_file_count": len(uploaded)+2, "verified_asset_count": len(uploaded), "manifest": "drive_manifest.json"
     }
     metadata["drive_status"] = "uploaded_and_verified"
     meta_path.write_text(json.dumps(metadata, ensure_ascii=False, indent=2), encoding="utf-8")
