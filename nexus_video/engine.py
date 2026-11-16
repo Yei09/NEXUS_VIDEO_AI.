@@ -12,7 +12,7 @@ STORIES=[
 ("El reflejo equivocado","paranormal",["Si tu reflejo tarda en imitarte, no intentes comprobarlo otra vez.","Lucía se lavaba los dientes cuando vio que su reflejo seguía sonriendo después de que ella dejó de hacerlo.","Apagó la luz. En la oscuridad, el espejo se iluminó solo. Su reflejo levantó una mano y escribió desde el otro lado: «Déjame salir».","Lucía retrocedió. El reflejo no la siguió; se quedó quieto, mirando la puerta del baño.","Al girarse, escuchó el pestillo cerrarse detrás de ella."])]
 def run(cmd):
  p=subprocess.run(cmd,text=True,capture_output=True)
- if p.returncode: raise RuntimeError(f"Fallo: {' '.join(cmd)}\\n{p.stderr[-2500:]}")
+ if p.returncode: raise RuntimeError(f"Fallo: {' '.join(cmd)}\n{p.stderr[-2500:]}")
  return p.stdout.strip()
 def dur(p): return float(run(["ffprobe","-v","error","-show_entries","format=duration","-of","default=noprint_wrappers=1:nokey=1",str(p)]))
 def draw_scene(path,title,caption,i,n):
@@ -52,14 +52,14 @@ def main():
   pth=WORK/f"scene-{i+1}.png"; draw_scene(pth,title,part,i+1,len(parts)); imgs.append(pth)
  concat=WORK/"scenes.txt"; each=seconds/len(imgs)
  with concat.open("w",encoding="utf-8") as f:
-  for pth in imgs: f.write(f"file '{pth.resolve()}'\\nduration {each:.4f}\\n")
-  f.write(f"file '{imgs[-1].resolve()}'\\n")
+  for pth in imgs: f.write(f"file '{pth.resolve()}'\nduration {each:.4f}\n")
+  f.write(f"file '{imgs[-1].resolve()}'\n")
  words=script.split(); chunks=[" ".join(words[i:i+6]) for i in range(0,len(words),6)]
  def ts(v):
   ms=int(v*1000); h,ms=divmod(ms,3600000); m,ms=divmod(ms,60000); sec,ms=divmod(ms,1000); return f"{h:02}:{m:02}:{sec:02},{ms:03}"
  with (WORK/"captions.srt").open("w",encoding="utf-8") as f:
   step=seconds/len(chunks)
-  for i,c in enumerate(chunks): f.write(f"{i+1}\\n{ts(i*step)} --> {ts(min(seconds,(i+1)*step))}\\n{c}\\n\\n")
+  for i,c in enumerate(chunks): f.write(f"{i+1}\n{ts(i*step)} --> {ts(min(seconds,(i+1)*step))}\n{c}\n\n")
  stamp=datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ"); mp4=OUT/f"nexus-terror-{stamp}.mp4"
  vf="scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,subtitles=work/captions.srt:force_style='FontName=DejaVu Sans,FontSize=34,PrimaryColour=&H00FFFFFF,OutlineColour=&H80000000,BorderStyle=1,Outline=3,Shadow=1,Alignment=2,MarginV=190'"
  fc=f"[0:v]{vf}[v];[2:a]volume=0.18,lowpass=f=180[a1];[3:a]volume=0.07,lowpass=f=650,afade=t=out:st={max(0,seconds-3):.2f}:d=3[a2];[a1][a2]amix=inputs=2:duration=longest,volume=0.55[m];[1:a][m]amix=inputs=2:duration=first:weights=1 0.32[a]"
