@@ -6,11 +6,11 @@ from googleapiclient.http import MediaFileUpload
 
 def main():
     raw=os.getenv("GOOGLE_SERVICE_ACCOUNT_JSON","")
-    if not raw: raise RuntimeError("Falta GOOGLE_SERVICE_ACCOUNT_JSON.")
+    if not raw: print("Google Drive no configurado; carga omitida."); return
     creds=service_account.Credentials.from_service_account_info(json.loads(raw),scopes=["https://www.googleapis.com/auth/drive"])
     drive=build("drive","v3",credentials=creds,cache_discovery=False)
     folder=os.getenv("GOOGLE_DRIVE_FOLDER_ID","").strip()
-    if not folder: raise RuntimeError("Falta GOOGLE_DRIVE_FOLDER_ID.")
+    if not folder: print("GOOGLE_DRIVE_FOLDER_ID no configurado; carga omitida."); return
     meta=json.loads(Path("output/metadata.json").read_text(encoding="utf-8")); mp4=Path(meta["file"])
     media=MediaFileUpload(str(mp4),mimetype="video/mp4",resumable=True,chunksize=8*1024*1024)
     req=drive.files().create(body={"name":mp4.name,"parents":[folder]},media_body=media,fields="id,name,mimeType,size,webViewLink,parents")
