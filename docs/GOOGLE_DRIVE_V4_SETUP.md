@@ -53,7 +53,7 @@ La primera ejecución crea una carpeta raíz propia llamada NEXUS VIDEO AI y su 
 - INFORMES/<request_id>/
 - ERRORES/<request_id>/
 
-Cada request_id tiene su propio destino. Si se repite la misma solicitud de subida, el cargador busca el nombre dentro de su carpeta y compara el contenido; no crea copias redundantes si el archivo ya coincide.
+Cada request_id tiene su propio destino. Si se repite la misma solicitud de subida, el cargador busca el nombre dentro de su carpeta y compara el contenido; no crea copias redundantes si el archivo ya coincide. Los archivos ocupan espacio de tu cuota de Google Drive, según el almacenamiento disponible en tu cuenta.
 
 ## Verificación y recuperación
 
