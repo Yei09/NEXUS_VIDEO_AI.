@@ -103,9 +103,10 @@ def main():
  story=next((s for s in STORIES if s[1]==os.getenv("HORROR_CATEGORY")),None) or rng.choice(STORIES)
  title,genre,parts=story; script=" ".join(parts)
  voice=os.getenv("PIPER_VOICE","es_MX-claude-high")
- try: lang,region,speaker,quality=voice.split("-")
+ try:
+  locale,speaker,quality=voice.split("-"); lang,region=locale.split("_")
  except ValueError: raise RuntimeError("PIPER_VOICE debe tener formato es_MX-nombre-calidad.")
- base=f"https://huggingface.co/rhasspy/piper-voices/resolve/main/es/{lang}/{region}/{speaker}/{quality}/{voice}"
+ base=f"https://huggingface.co/rhasspy/piper-voices/resolve/main/es/{locale}/{speaker}/{quality}/{voice}"
  model=WORK/"voice.onnx"; cfg=WORK/"voice.onnx.json"
  for url,target in ((base+".onnx",model),(base+".onnx.json",cfg)):
   if not target.exists(): print("Descargando Piper:",voice); urllib.request.urlretrieve(url,target)
@@ -137,7 +138,7 @@ def main():
  for i,part in enumerate(parts):
   p=WORK/f"scene-{i}.jpg"; draw_scene(p,part,genre,seed+i*991); images.append(p)
  subtitles(parts,lengths,pauses,WORK/"captions.ass")
- seg=seconds/len(images); cmd=["ffmpeg","-y"]
+ seg=(seconds+(len(images)-1)*XFADE)/len(images); cmd=["ffmpeg","-y"]
  for p in images: cmd += ["-loop","1","-framerate",str(FPS),"-t",f"{seg:.4f}","-i",str(p)]
  narr=len(images); cmd += ["-i",str(narration),"-f","lavfi","-i",f"anoisesrc=color=pink:amplitude=0.035:sample_rate=44100:duration={seconds:.3f}","-f","lavfi","-i",f"sine=frequency=49:sample_rate=44100:duration={seconds:.3f}","-f","lavfi","-i",f"sine=frequency=67:sample_rate=44100:duration={seconds:.3f}"]
  wind=narr+1; drone=narr+2; impacts=narr+3
