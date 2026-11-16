@@ -274,28 +274,88 @@ def render_frame(event, t, frame_no, total_frames, seed):
     phase = t * 2 * math.pi
     # Event-specific foreground action; no single scene plate is reused.
     if event["action"] == "phone_ring":
-        # A landline handset/base: deliberately horizontal and placed on the room table.
-        cx, cy = 275, 565
-        wobble = int(8 * math.sin(phase * 5))
-        d.rounded_rectangle((cx-105+wobble, cy-58, cx+105+wobble, cy+58), radius=24, fill=(22, 21, 22, 255), outline=(165, 145, 112, 255), width=8)
-        d.arc((cx-72+wobble, cy-42, cx+72+wobble, cy+42), 0, 360, fill=(185, 164, 128, 230), width=5)
-        for k in range(10):
-            x = cx-44+(k%5)*22+wobble
-            y = cy-10+(k//5)*23
-            d.ellipse((x, y, x+8, y+8), fill=(3, 4, 6, 255))
-    elif event["action"] == "screen_call":
-        # A vertical mobile phone with a lit incoming-call screen, not a duplicate landline.
-        cx, cy = 275, 455
+        # Wide establishing composition: a heavy tabletop landline in a lived-in room.
+        im = Image.new("RGBA", (BASE_W, BASE_H), (7, 8, 13, 255))
+        ld = ImageDraw.Draw(im, "RGBA")
+        for y in range(BASE_H):
+            shade = int(12 + 25*y/BASE_H)
+            ld.line((0, y, BASE_W, y), fill=(shade, shade-2, shade-1, 255))
+        # Wall panels, a dim practical lamp and a strong horizontal desk plane.
+        ld.rectangle((35, 90, 505, 535), fill=(19, 17, 19, 255), outline=(74, 62, 49, 255), width=5)
+        ld.rectangle((58, 118, 482, 500), outline=(43, 39, 38, 255), width=3)
+        ld.ellipse((330, 85, 560, 315), fill=(206, 157, 92, 28))
+        ld.line((0, 600, BASE_W, 505), fill=(119, 91, 61, 180), width=8)
+        ld.polygon([(0, 625), (BASE_W, 535), (BASE_W, BASE_H), (0, BASE_H)], fill=(42, 27, 20, 255))
+        for y in (690, 790, 900):
+            ld.line((0, y, BASE_W, y-85), fill=(88, 57, 37, 170), width=4)
+        # Broad, horizontal base with a real cradle, keypad and separate handset.
         wobble = int(5 * math.sin(phase * 5))
-        d.rounded_rectangle((cx-78+wobble, cy-150, cx+78+wobble, cy+150), radius=25,
-                            fill=(2, 4, 8, 255), outline=(150, 165, 175, 255), width=8)
-        d.rounded_rectangle((cx-61+wobble, cy-126, cx+61+wobble, cy+126), radius=14,
-                            fill=(18, 34, 48, 255), outline=(75, 105, 125, 255), width=3)
-        d.ellipse((cx-19+wobble, cy-92, cx+19+wobble, cy-54), fill=(95, 135, 155, 230))
-        d.rounded_rectangle((cx-42+wobble, cy-35, cx+42+wobble, cy-25), radius=5, fill=(185, 198, 205, 210))
-        d.rounded_rectangle((cx-30+wobble, cy-7, cx+30+wobble, cy+1), radius=4, fill=(130, 150, 165, 190))
-        d.ellipse((cx-37+wobble, cy+55, cx-7+wobble, cy+85), fill=(50, 185, 105, 255))
-        d.ellipse((cx+7+wobble, cy+55, cx+37+wobble, cy+85), fill=(195, 65, 65, 255))
+        ld.ellipse((45, 690, 500, 870), fill=(0, 0, 0, 100))
+        ld.rounded_rectangle((70+wobble, 590, 465+wobble, 810), radius=34,
+                             fill=(27, 28, 29, 255), outline=(174, 143, 103, 255), width=9)
+        ld.polygon([(100+wobble, 625), (430+wobble, 625), (410+wobble, 770), (120+wobble, 770)],
+                   fill=(42, 43, 42, 255), outline=(103, 91, 76, 255))
+        for row in range(3):
+            for col in range(4):
+                x, y = 180+col*35+wobble, 660+row*31
+                ld.ellipse((x, y, x+19, y+19), fill=(7, 8, 9, 255), outline=(132, 122, 106, 255), width=2)
+        # Handset is visibly separate from the base and connected by a coiled cord.
+        hx = 265 + wobble
+        ld.rounded_rectangle((hx-155, 530, hx+155, 605), radius=35,
+                             fill=(18, 19, 20, 255), outline=(190, 164, 124, 255), width=8)
+        ld.ellipse((hx-170, 535, hx-115, 600), fill=(10, 11, 12, 255), outline=(170, 145, 111, 255), width=6)
+        ld.ellipse((hx+115, 535, hx+170, 600), fill=(10, 11, 12, 255), outline=(170, 145, 111, 255), width=6)
+        cord = [(420, 595), (450, 610), (430, 628), (458, 646), (438, 664), (463, 682), (440, 700)]
+        ld.line(cord, fill=(190, 169, 133, 255), width=5)
+        ld.ellipse((35, 160, 95, 220), fill=(224, 174, 100, int(35+25*abs(math.sin(phase*2)))))
+        # A subtle shadow anchors the apparatus to the room rather than floating.
+    elif event["action"] == "screen_call":
+        # Contrasting close-up: handheld smartphone at a diagonal, cold screen light,
+        # shallow-focus night window and no desk/landline geometry.
+        im = Image.new("RGBA", (BASE_W, BASE_H), (3, 8, 18, 255))
+        md = ImageDraw.Draw(im, "RGBA")
+        for y in range(BASE_H):
+            glow = int(5 + 22*(1-y/BASE_H))
+            md.line((0, y, BASE_W, y), fill=(glow//2, glow, glow+12, 255))
+        # Night window in deep perspective; rain streaks and distant lights.
+        md.polygon([(0, 0), (BASE_W, 0), (BASE_W, 560), (0, 760)], fill=(5, 17, 32, 255))
+        md.line((35, 0, 115, 690), fill=(72, 104, 132, 130), width=7)
+        md.line((310, 0, 250, 650), fill=(72, 104, 132, 100), width=5)
+        for k in range(18):
+            x = (k*83 + 29) % BASE_W
+            y = (k*47 + 80) % 560
+            md.ellipse((x, y, x+8, y+8), fill=(124, 170, 205, 90))
+        # A hand/forearm silhouette enters from the lower edge holding the device.
+        md.polygon([(120, BASE_H), (220, 735), (360, 690), (470, BASE_H)], fill=(13, 16, 23, 255))
+        # Draw the smartphone and its interface on a transparent layer, then rotate
+        # the whole device to create a clear oblique perspective.
+        device = Image.new("RGBA", (300, 560), (0, 0, 0, 0))
+        sd = ImageDraw.Draw(device, "RGBA")
+        sd.rounded_rectangle((28, 18, 272, 540), radius=38, fill=(1, 3, 8, 255),
+                             outline=(154, 177, 195, 255), width=10)
+        sd.rounded_rectangle((45, 42, 255, 516), radius=25, fill=(13, 35, 57, 255),
+                             outline=(73, 119, 153, 255), width=3)
+        sd.ellipse((116, 100, 184, 168), fill=(105, 150, 180, 255))
+        sd.ellipse((128, 110, 172, 154), fill=(28, 48, 69, 255))
+        sd.rounded_rectangle((83, 190, 217, 207), radius=8, fill=(226, 237, 244, 245))
+        sd.rounded_rectangle((103, 220, 197, 231), radius=5, fill=(147, 181, 202, 220))
+        sd.text((87, 270), "LLAMADA", font=load_font(17), fill=(223, 235, 244, 255))
+        sd.text((96, 296), "ENTRANTE", font=load_font(15), fill=(155, 187, 210, 255))
+        sd.ellipse((68, 405, 132, 469), fill=(44, 190, 112, 255))
+        sd.ellipse((168, 405, 232, 469), fill=(206, 62, 72, 255))
+        # handset glyphs inside the accept/reject controls
+        sd.arc((84, 419, 116, 451), 190, 345, fill=(255, 255, 255, 255), width=6)
+        sd.arc((184, 419, 216, 451), 195, 350, fill=(255, 255, 255, 255), width=6)
+        rotated = device.rotate(-13 + 1.8*math.sin(phase*3), resample=Image.Resampling.BICUBIC, expand=True)
+        # Screen glow is rendered as a blurred light layer behind the actual phone.
+        glow_layer = Image.new("RGBA", (BASE_W, BASE_H), (0, 0, 0, 0))
+        gd = ImageDraw.Draw(glow_layer, "RGBA")
+        gd.ellipse((80, 390, 520, 1120), fill=(50, 145, 210, 72))
+        im = Image.alpha_composite(im, glow_layer.filter(ImageFilter.GaussianBlur(62)))
+        im.alpha_composite(rotated, (115, 335))
+        md = ImageDraw.Draw(im, "RGBA")
+        md.line((80, 180, 55, 520), fill=(160, 200, 225, 90), width=4)
+        md.line((470, 120, 415, 570), fill=(160, 200, 225, 70), width=3)
     elif event["action"] in ("walk_down", "figure_descend", "shadow_approach", "passenger_turn"):
         x = int(265 + 26*math.sin(phase))
         draw_character(d, x, 430 + int(10*math.sin(phase*2)), 0.95, "walking")
