@@ -93,12 +93,29 @@ def restore_checkpoint(resume_root, frames_dir, out):
             target.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(source, target)
             restored += 1
-    scene_target = out / "scene.blend"
-    if not scene_target.exists():
-        for candidate in resume_root.rglob("scene.blend"):
-            if candidate.is_file() and candidate.stat().st_size > 1024 * 1024:
-                shutil.copy2(candidate, scene_target)
+    # Preserve scene metadata and prior block logs as part of the recovery checkpoint.
+    for filename in (
+        "scene.blend", "scene_manifest.json", "audio_master.wav", "audio_cues.json",
+        "effects.wav", "narration.wav", "blender_timing.json",
+        "block_timings.json", "frame_state.json",
+    ):
+        target = out / filename
+        if target.exists():
+            continue
+        for candidate in resume_root.rglob(filename):
+            if candidate.is_file():
+                target.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(candidate, target)
                 break
+    for source_dir in resume_root.rglob("logs"):
+        if source_dir.is_dir():
+            for source in source_dir.rglob("*"):
+                if source.is_file():
+                    relative = source.relative_to(source_dir)
+                    target = out / "logs" / relative
+                    target.parent.mkdir(parents=True, exist_ok=True)
+                    if not target.exists():
+                        shutil.copy2(source, target)
     return restored
 
 
