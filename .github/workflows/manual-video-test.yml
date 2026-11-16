@@ -3,14 +3,10 @@ on:
   workflow_dispatch:
     inputs:
       title:
-        description: Título del vídeo de prueba
+        description: Título de la historia (opcional)
         required: true
-        default: Lo que tu cerebro hace mientras duermes
-      script:
-        description: Guion en español (mínimo 45 palabras)
-        required: false
-        default: ¿Sabías que tu cerebro sigue trabajando mientras duermes? Durante el sueño organiza recuerdos, procesa emociones y refuerza aprendizajes. Por eso descansar no es perder el tiempo: es una parte esencial de aprender. Una rutina sencilla ayuda: baja la luz, evita pantallas antes de acostarte y procura dormir a una hora parecida cada noche. Tu descanso también merece un lugar en tu lista de prioridades. Incluso una breve siesta puede ayudarte si estás agotado, pero mantén una rutina nocturna constante.
-permissions:
+        default: La llamada del sótano
+      script:\n        description: Guion opcional; vacío para generar una historia de terror original\n        required: false\n        default: ''\npermissions:
   contents: read
 concurrency:
   group: nexus-video-manual-test
