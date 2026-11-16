@@ -167,8 +167,15 @@ def allocate_pause_durations(speech_lengths, target_seconds, requested_pause, in
             f"La voz ocupa {sum(speech_lengths):.3f}s y no deja pausas naturales suficientes "
             f"para alcanzar {target_seconds:.3f}s."
         )
-    weight = requested_pause * (0.67 if intensity == "urgent" else 1.0)
-    pauses = [available / boundary_count for _ in range(boundary_count)]
+    base_pause = requested_pause * (0.67 if intensity == "urgent" else 1.0)
+    base_pause = min(base_pause, available / boundary_count)
+    remaining = available - base_pause * boundary_count
+    # Longer dramatic holds before the reveal and final beat; shorter between setup beats.
+    weights = [1.0, 1.12, 0.92, 1.28, 1.08][:boundary_count]
+    if boundary_count > len(weights):
+        weights.extend([1.0] * (boundary_count - len(weights)))
+    weight_total = sum(weights)
+    pauses = [base_pause + remaining * w / weight_total for w in weights]
     pauses[-1] += available - sum(pauses)
     return pauses
 
