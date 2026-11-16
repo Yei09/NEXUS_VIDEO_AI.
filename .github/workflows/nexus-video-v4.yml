@@ -104,6 +104,7 @@ jobs:
       PAUSE_SECONDS: ${{ inputs.pause_seconds }}
       NARRATION_INTENSITY: ${{ inputs.narration_intensity }}
       VOICE_AUDITIONS: ${{ inputs.voice_auditions }}
+      DRIVE_CONFIGURED: ${{ secrets.GOOGLE_OAUTH_CLIENT_JSON != '' && secrets.GOOGLE_OAUTH_REFRESH_TOKEN != '' }}
     steps:
       - name: Checkout V4 branch
         uses: actions/checkout@v4
@@ -212,7 +213,7 @@ jobs:
         run: python -m nexus_video.notify_make_v4
       - name: Upload and verify all files in Google Drive
         id: drive
-        if: ${{ (inputs.operation == 'render' && steps.render.outcome == 'success') || inputs.operation == 'upload_only' }}
+        if: ${{ ((inputs.operation == 'render' && steps.render.outcome == 'success') || inputs.operation == 'upload_only') && env.DRIVE_CONFIGURED == 'true' }}
         env:
           REQUEST_ID: ${{ steps.request.outputs.request_id }}
           GOOGLE_OAUTH_CLIENT_JSON: ${{ secrets.GOOGLE_OAUTH_CLIENT_JSON }}
@@ -234,7 +235,7 @@ jobs:
       - name: Send final status to Make
         if: ${{ always() }}
         env:
-          NEXUS_STATUS: ${{ steps.drive.outcome == 'success' && 'completed' || steps.drive.outcome == 'failure' && 'drive_upload_failed' || 'error' }}
+          NEXUS_STATUS: ${{ steps.drive.outcome == 'success' && 'completed' || steps.drive.outcome == 'failure' && 'drive_upload_failed' || (inputs.operation == 'render' && 'rendered') || 'error' }}
           REQUEST_ID: ${{ steps.request.outputs.request_id }}
           ARTIFACT_NAME: nexus-v4-${{ steps.request.outputs.request_id }}
           MAKE_RESULT_WEBHOOK_URL: ${{ secrets.MAKE_RESULT_WEBHOOK_URL }}
