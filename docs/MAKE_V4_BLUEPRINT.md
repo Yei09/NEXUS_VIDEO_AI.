@@ -52,7 +52,7 @@ Módulos en este orden:
    - narration_intensity es calm, mysterious o urgent
    - si operation=upload_only, request_id y source_run_id son obligatorios.
 3. Usa un Router según operation:
-   - Ruta render: Data Store > Add/Replace a Record con Key=request_id y Overwrite desactivado. Si la clave ya existe, la operación falla; la ruta de error responde HTTP 409 duplicate_request y no despacha un nuevo render.
+   - Ruta render: Data Store > Add/Replace a Record con Key=request_id, status=pending, stage=queued y Overwrite desactivado. Si la clave ya existe, la operación falla; la ruta de error responde HTTP 409 duplicate_request y no despacha un nuevo render.
    - Ruta upload_only: Data Store > Get a Record con Key=request_id. Solo continúa si el registro existe, status=error, stage=drive_upload_failed y el campo source_run_id del registro coincide exactamente con source_run_id de la solicitud. Después usa Data Store > Update a Record para status=pending, stage=drive_retry. Si no coincide, responde HTTP 409 retry_not_allowed.
    Activa Process data in order en la configuración del escenario para serializar las solicitudes y reducir carreras entre comprobación y escritura.
 4. HTTP > Make a request (HTTP v4):
@@ -82,8 +82,7 @@ Módulos en este orden:
        }
 
    Sustituye cada marcador por el campo mapeado del webhook. voice_auditions debe mapearse como booleano JSON true/false, no como texto. Si operation=render, source_run_id puede enviarse como cadena vacía.
-5. Data Store > Update a Record: status=pending, stage=dispatched, updated_at=now; conserva request_id y parámetros.
-6. Webhooks > Webhook Response: HTTP 202, Content-Type application/json, body:
+5. Webhooks > Webhook Response: HTTP 202, Content-Type application/json, body:
 
        {
          "schema_version": "1.0",
@@ -92,7 +91,7 @@ Módulos en este orden:
          "message": "Solicitud aceptada; GitHub Actions notificará el progreso."
        }
 
-GitHub devuelve HTTP 204 al despachar workflow_dispatch; ese 204 solo confirma que GitHub aceptó el evento, no que el render haya terminado. El run_id se obtiene del callback inicial de GitHub.
+GitHub devuelve HTTP 204 al despachar workflow_dispatch; ese 204 solo confirma que GitHub aceptó el evento, no que el render haya terminado. El run_id se obtiene del callback inicial de GitHub. No añadas un Update a Record después del HTTP 204: el callback puede llegar antes y no debe sobrescribirse con pending. Si el despacho falla, la ruta de error actualiza status=error y stage=dispatch_failed.
 
 ### Credencial GitHub en Make
 
