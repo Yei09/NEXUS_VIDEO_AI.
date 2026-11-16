@@ -1,7 +1,7 @@
 name: NEXUS Blender 3D prototype (manual)
 on:
   pull_request:
-    branches: [main]
+    branches: [cinematic-v3]
     types: [synchronize]
   workflow_dispatch:
     inputs:
@@ -34,7 +34,7 @@ jobs:
             [[ "$EVENT_ACTION" == "synchronize" ]]
             [[ "$PR_NUMBER" == "3" ]]
             [[ "$PR_HEAD_REF" == "cinematic-reconstruction" ]]
-            [[ "$PR_BASE_REF" == "main" ]]
+            [[ "$PR_BASE_REF" == "cinematic-v3" ]]
             [[ "$PR_HEAD_REPO" == "$GITHUB_REPOSITORY" ]]
             [[ "$PR_HEAD_SHA" =~ ^[0-9a-f]{40}$ ]]
             echo "SOURCE_SHA=$PR_HEAD_SHA" >> "$GITHUB_ENV"
