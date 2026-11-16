@@ -92,6 +92,8 @@ jobs:
     timeout-minutes: 90
     env:
       REQUEST_ID: ${{ inputs.request_id }}
+      OPERATION: ${{ inputs.operation }}
+      SOURCE_RUN_ID: ${{ inputs.source_run_id }}
       CATEGORY: ${{ inputs.category }}
       DURATION_SECONDS: ${{ inputs.duration_seconds }}
       PIPER_VOICE: ${{ inputs.voice }}
