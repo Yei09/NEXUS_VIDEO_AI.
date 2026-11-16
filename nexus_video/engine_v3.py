@@ -176,6 +176,15 @@ def draw_frame(kind,motion,index,total,seed,transition):
  if motion=="shadow" and index%30<3:
   dx=random.Random(seed+index).randint(-5,5); dy=random.Random(seed-index).randint(-4,4)
   shifted=Image.new("RGBA",(BASE_W,BASE_H),(0,0,0,255)); shifted.alpha_composite(im,(dx,dy)); im=shifted
+ # Cinematic camera path: slow dolly-in plus a restrained lateral/vertical drift.
+ zoom=1.015+0.035*t
+ sw,sh=int(BASE_W*zoom),int(BASE_H*zoom)
+ moved=im.resize((sw,sh),Image.Resampling.LANCZOS)
+ max_x,max_y=sw-BASE_W,sh-BASE_H
+ phase=(seed%31)/31*math.pi*2
+ left=max(0,min(max_x,int(max_x/2+max_x*0.38*math.sin(t*math.pi*1.4+phase))))
+ top=max(0,min(max_y,int(max_y/2+max_y*0.32*math.cos(t*math.pi*1.2+phase))))
+ im=moved.crop((left,top,left+BASE_W,top+BASE_H))
  return im.convert("RGB")
 def make_subtitles(events,lengths,path):
  # ASS captions: restrained lower-third, safe margins, max two lines.
@@ -246,11 +255,11 @@ def main():
   frames.mkdir(parents=True,exist_ok=True)
   # Allocate scene time proportionally to speech plus its dramatic pause.
   secs=lengths[i]+pauses[i]
-  count=max(30,int(math.ceil(secs*12)))
+  count=max(36,int(math.ceil(secs*15)))
   for n in range(count):
    frame=draw_frame(event["scene"],event["motion"],n,count,seed+i*997,event["transition"])
    frame.save(frames/f"frame-{n:04d}.jpg",quality=88)
-  run(["ffmpeg","-y","-framerate","12","-i",str(frames/"frame-%04d.jpg"),"-vf","scale=1080:1920:flags=lanczos,fps=30,format=yuv420p","-an","-c:v","libx264","-preset","veryfast","-crf","20",str(clip)])
+  run(["ffmpeg","-y","-framerate","15","-i",str(frames/"frame-%04d.jpg"),"-vf","scale=1080:1920:flags=lanczos,fps=30,format=yuv420p","-an","-c:v","libx264","-preset","veryfast","-crf","20",str(clip)])
   clips.append(clip); lengths_clip.append(duration(clip))
  # Concatenate unique animated scenes with hard cuts/crossfades matched to narrative events.
  concat=WORK/"scenes.txt"; concat.write_text("".join("file '"+str(p.resolve())+"'\n" for p in clips),encoding="utf-8")
@@ -311,7 +320,7 @@ def main():
    distinct.append(round(delta,3))
  if any(x<8.0 for x in distinct): raise RuntimeError("Dos escenas son demasiado similares; se detiene la entrega.")
  (OUT/"motion_report.json").write_text(json.dumps({"motion":motion,"pairwise_scene_difference":distinct,"motion_pass":True,"scene_diversity_pass":True},indent=2),encoding="utf-8")
- meta={"status":"rendered","version":"cinematic-v3","created_at":datetime.now(timezone.utc).isoformat(),"title":story["title"],"genre":story["genre"],"events":story["events"],"voice":voice_id,"voice_auditions":[v["id"] for v in VOICES],"narration_file":"narration.wav","video_file":mp4.name,"duration_seconds":round(secs,2),"width":1080,"height":1920,"fps":30,"video_codec":"h264","audio_codec":"aac","scene_count":len(clips),"motion_report":"motion_report.json","motion_verified":True,"scene_diversity_verified":True,"scene_types":[e["scene"] for e in story["events"]],"animation":"12 fps generated scene frames with moving props, silhouettes, fog, particles, flicker and impact shake; encoded at 30 fps","voice_processing":"pitch_down_0.7_semitone_with_duration_restored","sound_design":"event-timed synthesized cues, low drone and wind; narration mixed separately","social_publishing":False,"make_connected":False,"google_drive_connected":False}
+ meta={"status":"rendered","version":"cinematic-v3","created_at":datetime.now(timezone.utc).isoformat(),"title":story["title"],"genre":story["genre"],"events":story["events"],"voice":voice_id,"voice_auditions":[v["id"] for v in VOICES],"narration_file":"narration.wav","video_file":mp4.name,"duration_seconds":round(secs,2),"width":1080,"height":1920,"fps":30,"video_codec":"h264","audio_codec":"aac","scene_count":len(clips),"motion_report":"motion_report.json","motion_verified":True,"scene_diversity_verified":True,"scene_types":[e["scene"] for e in story["events"]],"animation":"15 fps generated scene frames with moving props, silhouettes, fog, particles, flicker, impact shake and per-scene dolly/pan camera path; encoded at 30 fps","voice_processing":"pitch_down_0.7_semitone_with_duration_restored","sound_design":"event-timed synthesized cues, low drone and wind; narration mixed separately","social_publishing":False,"make_connected":False,"google_drive_connected":False}
  (OUT/"metadata.json").write_text(json.dumps(meta,ensure_ascii=False,indent=2),encoding="utf-8")
  (OUT/"script.txt").write_text("\n".join(e["text"] for e in story["events"]),encoding="utf-8")
  print(json.dumps(meta,ensure_ascii=False,indent=2))
