@@ -46,7 +46,7 @@ def main():
  p=subprocess.run(["piper","--model",str(model),"--config",str(cfg),"--length_scale","1.12","--noise_scale","0.72","--noise_w","0.82","--output_file",str(wav)],input=script,text=True,capture_output=True)
  if p.returncode: raise RuntimeError("Piper TTS falló: "+p.stderr[-2000:])
  seconds=dur(wav)
- if not 30<=seconds<=60: raise RuntimeError(f"Duración de voz {seconds:.1f}s fuera de 25–60s.")
+ if not 30<=seconds<=60: raise RuntimeError(f"Duración de voz {seconds:.1f}s fuera de 30–60s.")
  imgs=[]
  for i,part in enumerate(parts):
   pth=WORK/f"scene-{i+1}.png"; draw_scene(pth,title,part,i+1,len(parts)); imgs.append(pth)
@@ -68,7 +68,7 @@ def main():
  v=next((x for x in probe["streams"] if x.get("codec_type")=="video"),None); a=next((x for x in probe["streams"] if x.get("codec_type")=="audio"),None)
  if not v or not a or v.get("width")!=W or v.get("height")!=H or v.get("codec_name")!="h264": raise RuntimeError("Validación de vídeo/audio fallida.")
  final=float(probe["format"]["duration"])
- if not 30<=final<=60: raise RuntimeError("Duración final fuera de 25–60s.")
+ if not 30<=final<=60: raise RuntimeError("Duración final fuera de 30–60s.")
  meta={"status":"rendered","created_at":datetime.now(timezone.utc).isoformat(),"genre":genre,"title":title,"script":script,"file":str(mp4),"size_bytes":mp4.stat().st_size,"duration_seconds":round(final,2),"width":W,"height":H,"video_codec":"h264","audio_codec":"aac","voice":voice,"ambience":"original_synthesized_horror_drone","social_publishing":False}
  (OUT/"metadata.json").write_text(json.dumps(meta,ensure_ascii=False,indent=2),encoding="utf-8"); (OUT/"script.txt").write_text(script,encoding="utf-8")
  print(json.dumps(meta,ensure_ascii=False,indent=2))
