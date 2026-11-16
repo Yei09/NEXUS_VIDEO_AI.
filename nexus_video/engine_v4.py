@@ -225,9 +225,28 @@ def scene_background(scene, variant):
     d.ellipse((BASE_W*0.58 + (variant % 5)*7, 80, BASE_W*1.10, 560), fill=(190, 174, 132, 20))
     d.rectangle((35 + (variant % 4)*24, 185, 75 + (variant % 4)*24, 310), fill=(85, 105, 120, 28), outline=(125, 140, 150, 75), width=2)
     d.rectangle((0, BASE_H-170, BASE_W, BASE_H), fill=(3, 4, 8, 210))
-    if scene in ("phone_room", "receiver_close", "floor_cable", "mobile_close"):
+    if scene in ("phone_room", "mobile_close"):
         d.polygon([(0, 570), (BASE_W//2, 470), (BASE_W, 570), (BASE_W, BASE_H), (0, BASE_H)], fill=(13, 13, 19, 255))
         d.rectangle((60, 590, 480, 635), fill=(47, 38, 30, 255))
+    elif scene == "receiver_close":
+        # Intimate tabletop macro: warm wood plane, wall trim and a pool of amber light.
+        d.rectangle((0, 0, BASE_W, 610), fill=(19, 16, 15, 255))
+        d.rectangle((0, 500, BASE_W, 535), fill=(78, 57, 39, 255))
+        d.polygon([(0, 590), (BASE_W, 535), (BASE_W, BASE_H), (0, BASE_H)], fill=(57, 38, 26, 255))
+        for x in (80, 220, 360, 500):
+            d.line((x, 650, x-55, BASE_H), fill=(91, 61, 39, 180), width=4)
+        d.ellipse((260, 80, 590, 420), fill=(210, 155, 87, 24))
+    elif scene == "floor_cable":
+        # Ground-level hallway perspective: converging floorboards and a deep vanishing point.
+        d.rectangle((0, 0, BASE_W, 455), fill=(7, 12, 19, 255))
+        d.polygon([(0, 390), (BASE_W, 390), (BASE_W, BASE_H), (0, BASE_H)], fill=(25, 29, 35, 255))
+        d.polygon([(0, 390), (BASE_W, 390), (BASE_W, 430), (0, 430)], fill=(66, 59, 49, 255))
+        for x in range(-500, 1000, 105):
+            d.line((BASE_W//2, 405, x, BASE_H), fill=(67, 66, 62, 210), width=4)
+        for y in (540, 680, 830):
+            d.line((0, y, BASE_W, y-35), fill=(48, 53, 60, 220), width=3)
+        d.polygon([(0, 330), (85, 330), (125, 455), (0, 455)], fill=(13, 17, 23, 255))
+        d.polygon([(455, 330), (BASE_W, 330), (BASE_W, 455), (415, 455)], fill=(13, 17, 23, 255))
     if scene == "stairs" or scene == "stairwell":
         for i in range(10):
             y = 280 + i*62
@@ -360,24 +379,73 @@ def render_frame(event, t, frame_no, total_frames, seed):
         x = int(265 + 26*math.sin(phase))
         draw_character(d, x, 430 + int(10*math.sin(phase*2)), 0.95, "walking")
         d.ellipse((x-75, 650, x+75, 700), fill=(140, 150, 165, 18))
-    elif event["action"] in ("receiver_lift", "mirror_smile", "reflection_smile"):
-        d.rounded_rectangle((205, 210+int(18*math.sin(phase*2)), 335, 735), radius=55, fill=(15, 16, 19, 255), outline=(155, 145, 126, 255), width=9)
-        d.ellipse((220, 245, 320, 345), fill=(2, 4, 8, 255))
-        d.ellipse((220, 630, 320, 720), fill=(2, 4, 8, 255))
-        for k in range(5):
-            d.arc((235, 365+k*38, 305, 405+k*38), 185, 345, fill=(130, 170, 180, 120), width=3)
+    elif event["action"] == "receiver_lift":
+        # Extreme close-up of the vintage handset, diagonal across the frame.
+        # Seed-driven framing variants make a retry alter the actual composition.
+        variant = seed % 3
+        dx = (-34, 0, 34)[variant]
+        bob = int(7 * math.sin(phase * 2))
+        # Deep, defocused room behind a narrow strip of amber tabletop.
+        d.rectangle((0, 0, BASE_W, 520), fill=(12, 11, 15, 255))
+        d.ellipse((245+dx, 100, 600+dx, 510), fill=(185, 130, 75, 22))
+        d.polygon([(0, 585), (BASE_W, 540), (BASE_W, BASE_H), (0, BASE_H)], fill=(54, 35, 24, 255))
+        # Ear cup and mouth cup are distinct oversized forms, joined by a curved grip.
+        handset = Image.new("RGBA", (BASE_W, BASE_H), (0, 0, 0, 0))
+        hd = ImageDraw.Draw(handset, "RGBA")
+        hd.line([(80+dx, 275+bob), (170+dx, 330+bob), (275+dx, 405+bob),
+                 (375+dx, 480+bob), (455+dx, 545+bob)], fill=(8, 9, 11, 255), width=72)
+        hd.line([(80+dx, 275+bob), (170+dx, 330+bob), (275+dx, 405+bob),
+                 (375+dx, 480+bob), (455+dx, 545+bob)], fill=(92, 88, 82, 255), width=56)
+        hd.ellipse((15+dx, 205+bob, 155+dx, 345+bob), fill=(15, 17, 19, 255),
+                   outline=(190, 158, 116, 255), width=9)
+        hd.ellipse((370+dx, 475+bob, 510+dx, 615+bob), fill=(12, 14, 16, 255),
+                   outline=(190, 158, 116, 255), width=9)
+        hd.ellipse((42+dx, 232+bob, 128+dx, 318+bob), fill=(3, 5, 7, 255))
+        hd.ellipse((397+dx, 502+bob, 483+dx, 588+bob), fill=(3, 5, 7, 255))
+        # Visible perforations, metal seam and coiled cord anchor the object in the shot.
+        for k in range(9):
+            px = 56+dx+(k%3)*23
+            py = 247+bob+(k//3)*23
+            hd.ellipse((px, py, px+7, py+7), fill=(112, 119, 121, 210))
+        hd.arc((115+dx, 280+bob, 355+dx, 500+bob), 15, 165, fill=(210, 187, 150, 220), width=4)
+        hd.line([(440+dx, 560+bob), (485+dx, 605), (465+dx, 650),
+                 (500+dx, 690), (475+dx, 730)], fill=(183, 157, 119, 255), width=5)
+        im = Image.alpha_composite(im, handset)
+        d = ImageDraw.Draw(im, "RGBA")
     elif event["action"] in ("shadow_cross", "shadow_stretch", "portrait_turn", "eyes_blink"):
         x = int(-110 + (BASE_W+220)*t)
         d.ellipse((x, 260, x+88, 360), fill=(0, 0, 0, 245))
         d.polygon([(x+18, 350), (x+72, 350), (x+150, 850), (x-65, 850)], fill=(0, 0, 0, 245))
-    elif event["action"] in ("cable_crawl", "hand_reach", "scrape"):
+    elif event["action"] == "cable_crawl":
+        # Low floor-level tracking shot: a long cable snakes from the distant doorway
+        # into the extreme foreground, with perspective-scaled width and a moving tip.
+        variant = seed % 3
+        offset = (-42, 0, 42)[variant]
+        d.rectangle((0, 0, BASE_W, 430), fill=(6, 10, 17, 255))
+        d.polygon([(0, 350), (BASE_W, 350), (BASE_W, BASE_H), (0, BASE_H)], fill=(24, 28, 34, 255))
+        # Baseboards and a door threshold establish a recognizable hallway.
+        d.polygon([(0, 300), (92, 300), (135, 440), (0, 440)], fill=(12, 16, 22, 255))
+        d.polygon([(448, 300), (BASE_W, 300), (BASE_W, 440), (405, 440)], fill=(12, 16, 22, 255))
+        d.line((0, 432, BASE_W//2, 390), fill=(107, 86, 62, 255), width=13)
+        d.line((BASE_W//2, 390, BASE_W, 432), fill=(107, 86, 62, 255), width=13)
+        # Perspective floor seams converge toward the hallway's vanishing point.
+        for x in range(-420, 1000, 115):
+            d.line((BASE_W//2, 405, x, BASE_H), fill=(72, 75, 78, 200), width=3)
+        # Cable path uses a large perspective curve rather than a short horizontal stroke.
         pts = []
-        for k in range(12):
-            x = 205 + k*25
-            y = 545 + int(28*math.sin(k*0.8 + phase*2))
+        for k in range(18):
+            u = k / 17
+            x = int(BASE_W/2 + offset + (u-0.5)*360 + 65*math.sin(u*math.pi*2 + phase*0.7))
+            y = int(405 + u*520 + 18*math.sin(u*math.pi*3 + phase*2))
             pts.append((x, y))
-        d.line(pts, fill=(176, 157, 122, 255), width=8)
-        d.ellipse((pts[-1][0]-12, pts[-1][1]-12, pts[-1][0]+12, pts[-1][1]+12), fill=(190, 170, 135, 255))
+        for k in range(len(pts)-1):
+            width = int(3 + 13*(k/(len(pts)-1)))
+            d.line((pts[k], pts[k+1]), fill=(3, 4, 6, 255), width=width+5)
+            d.line((pts[k], pts[k+1]), fill=(177, 154, 119, 255), width=width)
+        # Plug/connector lies near the distant vanishing point.
+        tip_x, tip_y = pts[0]
+        d.rounded_rectangle((tip_x-12, tip_y-18, tip_x+12, tip_y+18), radius=5,
+                            fill=(18, 19, 20, 255), outline=(197, 175, 137, 255), width=3)
     elif event["action"] in ("door_open", "door_creep", "handle_turn", "handle_rattle"):
         angle = int(38 + 15*math.sin(phase*2))
         d.polygon([(220, 200), (330, 210), (330+angle, 740), (220+angle, 735)], fill=(25, 23, 22, 255), outline=(140, 125, 100, 255))
