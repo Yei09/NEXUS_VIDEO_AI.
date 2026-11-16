@@ -518,19 +518,25 @@ def main():
         "intensity": os.getenv("NARRATION_INTENSITY", "mysterious"),
         "voice_auditions": os.getenv("VOICE_AUDITIONS", "false").lower() == "true"
     }
-    if not 30 <= request["duration_target"] <= 60:
-        raise ValueError("duration_seconds debe estar entre 30 y 60.")
-    if not 0.75 <= request["voice_rate"] <= 1.25:
-        raise ValueError("voice_rate debe estar entre 0.75 y 1.25.")
-    if not -2.0 <= request["pitch_semitones"] <= 2.0:
-        raise ValueError("pitch_semitones debe estar entre -2 y 2.")
-    if not 0.5 <= request["voice_volume"] <= 1.5:
-        raise ValueError("voice_volume debe estar entre 0.5 y 1.5.")
-    if not 0.2 <= request["pause_seconds"] <= 1.5:
-        raise ValueError("pause_seconds debe estar entre 0.2 y 1.5.")
-    if request["intensity"] not in ("calm", "mysterious", "urgent"):
-        raise ValueError("narration_intensity no válido.")
-    voice = get_voice(request["voice"])
+    (out/"errors").mkdir(exist_ok=True)
+    try:
+        if not 30 <= request["duration_target"] <= 60:
+            raise ValueError("duration_seconds debe estar entre 30 y 60.")
+        if not 0.75 <= request["voice_rate"] <= 1.25:
+            raise ValueError("voice_rate debe estar entre 0.75 y 1.25.")
+        if not -2.0 <= request["pitch_semitones"] <= 2.0:
+            raise ValueError("pitch_semitones debe estar entre -2 y 2.")
+        if not 0.5 <= request["voice_volume"] <= 1.5:
+            raise ValueError("voice_volume debe estar entre 0.5 y 1.5.")
+        if not 0.2 <= request["pause_seconds"] <= 1.5:
+            raise ValueError("pause_seconds debe estar entre 0.2 y 1.5.")
+        if request["intensity"] not in ("calm", "mysterious", "urgent"):
+            raise ValueError("narration_intensity no válido.")
+        voice = get_voice(request["voice"])
+    except Exception as exc:
+        (out/"errors"/"render_error.log").write_text(
+            f"{datetime.now(timezone.utc).isoformat()}\\n{type(exc).__name__}: {exc}\\n", encoding="utf-8")
+        raise
     story = generate_story(request["category"], request_id)
     (out/"story.txt").write_text(story["script"], encoding="utf-8")
     (out/"historia.txt").write_text(story["script"], encoding="utf-8")
