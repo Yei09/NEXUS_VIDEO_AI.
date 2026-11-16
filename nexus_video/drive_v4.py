@@ -74,6 +74,10 @@ def upload_one(drive, path, parent_id):
                 fields="id,name,mimeType,size,md5Checksum,webViewLink,parents").execute()
             if int(check.get("size", -1)) != local_size:
                 raise RuntimeError(f"Tamaño incorrecto después de subir {path.name}.")
+            if check.get("mimeType") != mime:
+                raise RuntimeError(f"MIME type incorrecto después de subir {path.name}: {check.get('mimeType')} != {mime}")
+            if parent_id not in check.get("parents", []):
+                raise RuntimeError(f"El archivo {path.name} quedó en una carpeta distinta a la solicitada.")
             if check.get("md5Checksum") and check["md5Checksum"] != local_md5:
                 raise RuntimeError(f"MD5 incorrecto después de subir {path.name}.")
             return check
