@@ -36,7 +36,7 @@ def main():
  mp4=out/"nexus_blender3d_10s.mp4"
  run([ffmpeg,"-y","-loglevel","error","-framerate","30","-i",str(frames/"frame_%04d.png"),"-i",str(out/"audio_master.wav"),"-frames:v","300","-vf","format=yuv420p","-c:v","libx264","-preset","veryfast","-crf","22","-r","30","-c:a","aac","-b:a","160k","-t","10","-movflags","+faststart",str(mp4)])
  # Six keyframes plus consecutive proof sequences around walking, door, and shadow.
- for label,times in {"six":[.5,2.2,4.2,5.5,7.4,9.5],"walk":[1.0,1.1,1.2,1.3,1.4,1.5],"door":[4.7,4.9,5.1,5.3,5.5,5.7],"shadow":[6.8,7.0,7.2,7.4,7.6,7.8]}.items():
+ for label,times in {"six":[.5,2.2,4.2,5.5,7.4,9.5],"walk":[1.0,1.0+1/30,1.0+2/30,1.0+3/30,1.0+4/30,1.0+5/30],"door":[6.4,6.4+1/30,6.4+2/30,6.4+3/30,6.4+4/30,6.4+5/30],"shadow":[7.1,7.1+1/30,7.1+2/30,7.1+3/30,7.1+4/30,7.1+5/30]}.items():
   dest=out/"evidence"/label; dest.mkdir(parents=True,exist_ok=True)
   for i,t in enumerate(times):
    run([ffmpeg,"-y","-loglevel","error","-ss",str(t),"-i",str(mp4),"-frames:v","1",str(dest/f"{i+1:02d}.jpg")])
