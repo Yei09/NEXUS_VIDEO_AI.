@@ -47,6 +47,8 @@ Módulos en este orden:
    - voice pertenece a los cuatro modelos permitidos
    - voice_rate está entre 0.75 y 1.25
    - pitch_semitones está entre -2 y 2
+   - voice_volume está entre 0.5 y 1.5
+   - pause_seconds está entre 0.2 y 1.5
    - narration_intensity es calm, mysterious o urgent
    - si operation=upload_only, request_id y source_run_id son obligatorios.
 3. Data Store > Add/Replace a Record. Usa Key=request_id y desactiva Overwrite an existing record. Si la clave ya existe, Make produce un error; añade una ruta de error que responda 409 duplicate_request y no despache otra generación. Activa Process data in order en la configuración del escenario para serializar las solicitudes y reducir carreras entre comprobación y escritura.
@@ -68,6 +70,8 @@ Módulos en este orden:
            "voice": "{{voice}}",
            "voice_rate": "{{voice_rate}}",
            "pitch_semitones": "{{pitch_semitones}}",
+           "voice_volume": "{{voice_volume}}",
+           "pause_seconds": "{{pause_seconds}}",
            "narration_intensity": "{{narration_intensity}}",
            "voice_auditions": {{voice_auditions}},
            "source_run_id": "{{source_run_id}}"
