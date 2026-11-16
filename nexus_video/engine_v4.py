@@ -401,7 +401,7 @@ def render_scene(event, seconds, work, index, variant_offset=0):
          "-c:v", "libx264", "-preset", "veryfast", "-crf", "18", "-r", "30", str(clip)])
     return clip, accepted[0], {"event_id": event["event_id"], "scene": event["scene"],
         "scene_label": SCENE_NAMES.get(event["scene"], event["scene"]), "mean_frame_difference": round(score, 3),
-        "frames_checked": frame_count, "retry_count": retries}
+        "frames_checked": frame_count, "retry_count": retries, "diversity_regeneration_count": 0}
 
 def write_subtitles(events, starts, lengths, path):
     def ts(v):
@@ -595,6 +595,7 @@ def main():
             clips[weak_index], first_frames[weak_index], scene_metrics[weak_index] = render_scene(
                 story["events"][weak_index], lengths[weak_index]+(pauses[weak_index] if weak_index < len(pauses)-1 else 0),
                 work, weak_index, variant_offset=diversity_attempt)
+            scene_metrics[weak_index]["diversity_regeneration_count"] = diversity_attempt
         pair_diffs = [image_difference(first_frames[i], first_frames[j])
                       for i in range(len(first_frames)) for j in range(i+1, len(first_frames))]
         if any(v < 7.0 for v in pair_diffs):
