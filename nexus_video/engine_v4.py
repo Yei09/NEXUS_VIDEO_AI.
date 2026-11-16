@@ -597,7 +597,7 @@ def main():
         music, effects = narration_dir/"music.wav", narration_dir/"effects.wav"
         create_audio_beds(story["events"], starts, total, sample_rate, music, effects, request["intensity"])
         audio_mix = narration_dir/"audio_mix.wav"
-        mix_filter = "[0:a]highpass=f=70,lowpass=f=11500,acompressor=threshold=0.12:ratio=2.1:attack=18:release=180,volume={request["voice_volume"]:.3f}[voice];[1:a]volume=0.34[music];[2:a]volume=0.55[fx];[voice][music][fx]amix=inputs=3:duration=first:weights='1 0.28 0.42',loudnorm=I=-16:TP=-1.5:LRA=10[mix]"
+        mix_filter = f"[0:a]highpass=f=70,lowpass=f=11500,acompressor=threshold=0.12:ratio=2.1:attack=18:release=180,volume={request['voice_volume']:.3f}[voice];[1:a]volume=0.34[music];[2:a]volume=0.55[fx];[voice][music][fx]amix=inputs=3:duration=first:weights='1 0.28 0.42',loudnorm=I=-16:TP=-1.5:LRA=10[mix]"
         run(["ffmpeg", "-y", "-i", str(narration), "-i", str(music), "-i", str(effects),
              "-filter_complex", mix_filter, "-map", "[mix]", "-c:a", "pcm_s16le", str(audio_mix)])
         video_dir = out/"videos"
