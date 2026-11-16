@@ -7,6 +7,7 @@ from pathlib import Path
 from PIL import Image, ImageDraw, ImageFilter, ImageChops, ImageStat, ImageFont
 from .story_v4 import generate_story
 from .cinematic_v42 import cinematic_finish, cinematic_camera
+from .cinematic_depth_v421 import render_depth_scene
 
 ROOT = Path(__file__).resolve().parents[1]
 OUT_ROOT = ROOT / "output"
@@ -545,8 +546,11 @@ def render_frame(event, t, frame_no, total_frames, seed):
         shifted = Image.new("RGBA", (BASE_W, BASE_H), (0, 0, 0, 255))
         shifted.alpha_composite(im, (dx, dy))
         im = shifted
-    # Narrative camera paths are event-specific; no generic zoom-only movement.
-    return cinematic_camera(im, event, t, frame_no, total_frames, seed)
+    # Independent action layers are composited before the final camera pass.
+    depth_frame, layer_manifest = render_depth_scene(im, event, t, frame_no, total_frames, seed)
+    render_frame.last_layer_manifest = layer_manifest
+    # Narrative camera paths remain event-specific; depth planes move independently first.
+    return cinematic_camera(depth_frame, event, t, frame_no, total_frames, seed)
 
 def image_difference(a, b):
     diff = ImageChops.difference(a.convert("RGB"), b.convert("RGB"))
@@ -584,7 +588,9 @@ def render_scene(event, seconds, work, index, variant_offset=0):
     return clip, accepted[1], {"event_id": event["event_id"], "scene": event["scene"],
         "scene_label": SCENE_NAMES.get(event["scene"], event["scene"]), "mean_frame_difference": round(score, 3),
         "diversity_sample": "midpoint", "frames_checked": frame_count,
-        "retry_count": retries, "diversity_regeneration_count": 0}
+        "retry_count": retries, "diversity_regeneration_count": 0,
+        "independent_layers": getattr(render_frame, "last_layer_manifest", []),
+        "depth_compositor": "v4.2.1-independent-overlay-layers"}
 
 def extract_representative_frames(mp4, out, events, starts, scene_durations):
     """Extract six representative JPEGs from the final encoded MP4, not source stills."""
@@ -653,7 +659,9 @@ def write_reports(out, story, events, scene_metrics, first_frames, starts, lengt
         "motion_pass": motion_pass, "scene_diversity_pass": diversity_pass,
         "scene_metrics": scene_metrics, "pairwise_scene_comparison": pairwise,
         "scene_count": len(events), "regeneration_limit_per_scene": 2,
-        "cinematic_profile": "layered_key_rim_light_volumetric_haze_depth_particles_v42",
+        "cinematic_profile": "v4.2.1_independent_action_layers_plus_v42_lighting",
+        "depth_compositor": "v4.2.1-independent-overlay-layers",
+        "independent_layer_manifest": [x.get("independent_layers", []) for x in scene_metrics],
         "camera_profile": "event_driven_dolly_pan_track_handheld_push_pull_reveal_v42",
         "note": "Las métricas comparan fotogramas renderizados; la aprobación estética final requiere revisión humana."
     }
@@ -680,13 +688,13 @@ def write_reports(out, story, events, scene_metrics, first_frames, starts, lengt
         "duration_error_seconds": round(abs(duration-request["duration_target"]), 3),
         "narration_file": narration.name, "audio_mix_file": audio_mix.name,
         "ffprobe_format": probe.get("format", {}).get("format_name"),
-        "cinematic_engine": "NEXUS V4.2 layered 2D cinematic compositor",
+        "cinematic_engine": "NEXUS V4.2.1 independent action-layer compositor (legacy scene plate retained)",
     }
     (out/"render_report.json").write_text(json.dumps(render_report, ensure_ascii=False, indent=2), encoding="utf-8")
     if not render_report["valid"]:
         raise RuntimeError("El MP4 no superó todos los criterios técnicos y visuales; revisa render_report.json y motion_report.json.")
     metadata = {
-        "schema_version": "1.0", "project": "NEXUS VIDEO AI", "version": "V4.2-cinematic",
+        "schema_version": "1.0", "project": "NEXUS VIDEO AI", "version": "V4.2.1-cinematic-depth",
         "request_id": request["request_id"], "status": "rendered",
         "created_at": datetime.now(timezone.utc).isoformat(),
         "category": story["category"], "genre": story["genre"], "title": story["title"],
