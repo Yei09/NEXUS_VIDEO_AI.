@@ -43,11 +43,18 @@ def ensure_folder(drive, name, parent_id):
     ).execute()
     return created
 
+def md5_file(path):
+    digest = hashlib.md5()
+    with open(path, "rb") as stream:
+        for chunk in iter(lambda: stream.read(8*1024*1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
 def upload_one(drive, path, parent_id):
     path = Path(path)
     mime = mimetypes.guess_type(path.name)[0] or "application/octet-stream"
     local_size = path.stat().st_size
-    local_md5 = hashlib.md5(path.read_bytes()).hexdigest()
+    local_md5 = md5_file(path)
     safe = path.name.replace("\\", "\\\\").replace("'", "\\'")
     q = f"name='{safe}' and '{parent_id}' in parents and trashed=false"
     existing = drive.files().list(q=q, pageSize=100, fields="files(id,name,mimeType,size,md5Checksum,webViewLink,parents)").execute().get("files", [])
@@ -125,7 +132,7 @@ def main():
     if samples.exists():
         for path in sorted(samples.glob("*.wav")):
             uploaded.append(upload_one(drive, path, voice_samples["id"]))
-    for name in ("story.txt", "script.txt", "story_events.json"):
+    for name in ("historia.txt", "story.txt", "script.txt", "story_events.json"):
         path = out/name
         if path.exists():
             uploaded.append(upload_one(drive, path, story_request["id"]))
