@@ -1,34 +1,69 @@
-# NEXUS VIDEO AI
+# NEXUS VIDEO AI V4
 
-Generador cloud de **historias originales de terror en español**. Esta prueba mejora el montaje para acercarlo al lenguaje de un cortometraje vertical: planos con movimiento, escenas ilustradas diferenciadas, transiciones, subtítulos compactos y diseño sonoro ambiental.
+Motor de producción audiovisual en español, desarrollado en una rama independiente para integrar GitHub Actions, Make.com y Google Drive.
 
-## Flujo de creación
+## Estado de esta versión
 
-1. Selecciona una categoría y ejecuta manualmente el workflow.
-2. Piper genera la narración por párrafos para conservar pausas dramáticas.
-3. Python/Pillow dibuja composiciones distintas según los acontecimientos (casa, sótano, autobús, dormitorio o espejo).
-4. FFmpeg anima cada plano con zoom lento, desplazamiento lateral, variación sutil de luz, grano y fundidos entre escenas.
-5. Subtítulos ASS discretos, con máximo dos líneas, se distribuyen según la duración de cada párrafo y las pausas.
-6. La mezcla incluye voz procesada moderadamente, viento, drone grave y golpes sintéticos sincronizados con los beats narrativos.
-7. Valida MP4 H.264/AAC, 1080×1920, 30 fps y duración de 30–60 segundos.
+Rama de trabajo: v4-make-drive (creada desde cinematic-v3).
 
-## Voz
+Esta rama incorpora el motor V4, un workflow manual, un cargador de Google Drive con OAuth y verificación, callbacks de Make y contratos/documentación para los escenarios y el futuro panel.
 
-La prueba usa `es_MX-claude-high`, voz masculina mexicana de calidad High del catálogo Piper. Se aplica un descenso moderado de tono y ecualización/compresión ligera. La calidad percibida y el carácter grave deben aprobarse escuchando el MP4 real; el catálogo no publica una medida objetiva de profundidad vocal.
+**Todavía no se ha ejecutado una generación V4 ni se ha conectado una cuenta Make o Google Drive.** La integración requiere secretos y escenarios creados por el propietario. Además, GitHub exige que el workflow_dispatch exista en la rama predeterminada antes de aceptar despachos API; el workflow de V4 está en esta rama y no se fusionará a main sin autorización.
 
-## Seguridad y límites
+## Capacidades implementadas en código
 
-- Solo ejecución manual con `workflow_dispatch`; no hay programación diaria.
-- Una ejecución crea exactamente una historia.
-- No se publica en TikTok, Instagram, YouTube ni ninguna red.
-- No se conecta Make ni Google Drive en este flujo.
-- No se incorporan APIs de pago ni se activa facturación.
-- El arte se genera proceduralmente con Python/Pillow: hay movimiento de cámara y composición por escena, pero no es metraje real ni generación cinematográfica mediante un modelo de vídeo.
-- Viento, drone y golpes son sonidos sintetizados por FFmpeg, no grabaciones Foley profesionales.
-- Las cinco historias siguen siendo guiones predefinidos; aún no hay generación narrativa dinámica ni sistema anti-repetición.
+- Historias en español compuestas localmente desde plantillas narrativas combinables; cada evento define escena, acción, cámara, efecto y transición.
+- Seis escenas por historia con composiciones 2D procedurales diferenciadas.
+- Animación por fotogramas: objetos/personajes, sombras, niebla, partículas, luces, cámara dolly/pan y vibración de impacto.
+- Verificación de movimiento entre fotogramas y diversidad entre escenas, con hasta dos regeneraciones limitadas para diversidad.
+- Piper TTS con cuatro modelos compatibles, velocidad configurable, ajuste de tono y nivel de intensidad.
+- Narración WAV separada, música ambiental y efectos sintetizados libres de muestras de terceros.
+- MP4 vertical 1080×1920, H.264/AAC, 30 FPS, 30–60 segundos, validación con ffprobe.
+- Google Drive: carpetas por request_id, subida reanudable, verificación de tamaño/MD5 y operación upload_only para reintentar sin renderizar.
+- Make: callbacks autenticados de estado y contrato exacto de workflow inputs.
 
-## Prueba manual
+**Límite visual:** el motor produce ilustraciones 2D animadas mediante Pillow/FFmpeg. No es metraje real, 3D ni generación de vídeo con un modelo generativo. La narrativa es local por plantillas, no un LLM.
 
-Abre Actions → **NEXUS Video - Manual Cinematic Horror Test** → Run workflow y elige una categoría. Descarga el artefacto `nexus-cinematic-horror-test`. Incluye el MP4, `metadata.json` y `script.txt`.
+## Ejecución manual
 
-**Estado:** los cambios de código y el workflow están guardados, pero esta revisión no ha ejecutado GitHub Actions ni ha generado/verificado un MP4. No se debe considerar aprobada la calidad audiovisual hasta escuchar y revisar el artefacto de esta prueba.
+Workflow: .github/workflows/nexus-video-v4.yml
+
+Inputs:
+- operation: render
+- request_id: UUID (puede quedar vacío en una ejecución manual)
+- category: paranormal / casa_embrujada / leyenda_urbana / criaturas / psicologico
+- duration_seconds: 30–60
+- voice: es_MX-claude-high / es_MX-ald-medium / es_ES-davefx-medium / es_ES-sharvard-medium
+- voice_rate: 0.75–1.25
+- pitch_semitones: -2 a +2
+- narration_intensity: calm / mysterious / urgent
+- voice_auditions: true para cuatro muestras WAV
+
+Para reintentar solo la carga de Drive, operation=upload_only y se requiere el request_id y source_run_id originales.
+
+## Configuración externa requerida
+
+1. Google Drive OAuth: seguir docs/GOOGLE_DRIVE_V4_SETUP.md.
+2. Make webhooks/Data Store: seguir docs/MAKE_V4_BLUEPRINT.md.
+3. Contratos de inputs y estados: docs/V4_ARCHITECTURE.md.
+4. Interfaces del futuro panel: docs/PANEL_API_V4.md.
+
+Secrets de GitHub:
+- GOOGLE_OAUTH_CLIENT_JSON
+- GOOGLE_OAUTH_REFRESH_TOKEN
+- MAKE_RESULT_WEBHOOK_URL
+- MAKE_WEBHOOK_API_KEY
+
+Token GitHub fine-grained se almacena como Credential en el módulo HTTP de Make; no se guarda en GitHub ni en el repositorio.
+
+## Archivos
+
+Cada generación crea output/<request_id>/ con videos, audios, historia, script, metadata, motion_report, render_report, thumbnail y errores. El workflow conserva el directorio como artefacto de GitHub antes de intentar Drive. La retención configurada es 14 días.
+
+## Restricciones
+
+- No cron ni generación diaria.
+- No publicación en redes.
+- No Make ni Google Drive se activan sin credenciales y autorización.
+- No facturación habilitada por este repositorio.
+- No se modifica main ni NEXUS_AI_ADVANCED.
