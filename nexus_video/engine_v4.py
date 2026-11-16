@@ -398,6 +398,8 @@ def render_frame(event, t, frame_no, total_frames, seed):
             d.text((180, 520), "SAL DE AQUÍ", font=load_font(20), fill=(225, 230, 230, 220))
     else:
         draw_character(d, int(270+20*math.sin(phase)), 440, 0.9)
+    # Rebind the drawing context because phone shots replace the background image.
+    d = ImageDraw.Draw(im, "RGBA")
     # A practical light flickers with the beat, while atmospheric layers drift continuously.
     flicker = 0.70 + 0.30 * abs(math.sin(frame_no * 0.23))
     d.ellipse((385, 90, 510, 215), fill=(210, 190, 145, int(18+45*flicker)))
