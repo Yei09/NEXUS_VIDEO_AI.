@@ -224,6 +224,9 @@ jobs:
           test -s "$output_dir/audios/music.wav"
           test -s "$output_dir/audios/effects.wav"
           test -s "$output_dir/audios/audio_mix.wav"
+          test -s "$output_dir/frames/contact_sheet.jpg"
+          frame_count="$(find "$output_dir/frames" -maxdepth 1 -type f -name 'scene-*.jpg' | wc -l)"
+          test "$frame_count" -eq 6
           python - "$mp4" "$output_dir/audios/narration.wav" "$output_dir/audios/audio_mix.wav" <<'PY'
           import json, subprocess, sys, os
           def media_duration(path):
@@ -245,6 +248,13 @@ jobs:
           assert abs(media_duration(sys.argv[2])-target) <= 0.15, "Narration WAV duration mismatch"
           assert abs(media_duration(sys.argv[3])-target) <= 0.15, "Audio mix WAV duration mismatch"
           assert 30 <= duration <= 60, f"Unexpected duration: {duration}"
+          report=json.load(open(os.path.join(os.path.dirname(sys.argv[1]), "..", "reports", "render_report.json"), encoding="utf-8"))
+          motion=json.load(open(os.path.join(os.path.dirname(sys.argv[1]), "..", "reports", "motion_report.json"), encoding="utf-8"))
+          assert report.get("valid") is True, "render_report.json is not valid"
+          assert motion.get("motion_pass") is True, "Motion threshold failed"
+          assert motion.get("scene_diversity_pass") is True, "Scene diversity threshold failed"
+          assert motion.get("motion_threshold") == 1.25, "Motion threshold was changed"
+          assert motion.get("scene_diversity_threshold") == 7.0, "Diversity threshold was changed"
           print(f"DELIVERABLES_OK mp4={sys.argv[1]} duration={duration:.3f}s target={target:.3f}s")
           PY
       - name: Download a previous artifact for Drive-only retry
