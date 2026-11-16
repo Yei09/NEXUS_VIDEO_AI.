@@ -185,7 +185,8 @@ def compose_scene_layers(background, layers, camera_target=None, focus_depth=.55
 def render_depth_scene(base_image, event, t, frame_no, total_frames, seed):
     """V4.2.1 depth compositor. Existing scene plate remains the fallback background."""
     size=base_image.size
-    layers=[]
+    # The V4.2 background is still a single legacy plate; keep it as an explicit far plane.
+    layers=[SceneLayer("background_plate_legacy",base_image.convert("RGBA"),.08,camera_weight=.12)]
     for layer in (
         _actor_layer(size,event,t,frame_no),
         _prop_layer(size,event,t,frame_no),
@@ -199,7 +200,8 @@ def render_depth_scene(base_image, event, t, frame_no, total_frames, seed):
     if event.get("camera") in {"lateral_track","push_in"}:
         target=(math.sin(t*math.pi)*size[0]*.035, -t*size[1]*.012)
     focus_depth=.78 if event.get("action") in {"phone_ring","receiver_lift","screen_call","door_open","cable_crawl"} else .58
-    return compose_scene_layers(base_image,layers,camera_target=target,focus_depth=focus_depth), [
+    canvas=Image.new("RGBA",size,(0,0,0,255))
+    return compose_scene_layers(canvas,layers,camera_target=target,focus_depth=focus_depth), [
         {"name":x.name,"depth":round(x.depth,3),"independent_transform":True,
          "position":[round(x.x,2),round(x.y,2)],"scale":round(x.scale,3),
          "rotation_degrees":round(x.rotation,3),"alpha_bounds":list(x.image.getbbox() or ()),
