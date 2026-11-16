@@ -40,7 +40,7 @@ jobs:
         run: python -m py_compile nexus_video/engine.py
       - name: Generate one cinematic horror story
         env:
-          HORROR_CATEGORY: \${{ inputs.category }}
+          HORROR_CATEGORY: ${{ inputs.category }}
           PIPER_VOICE: es_MX-claude-high
         run: python -m nexus_video.engine
       - name: Upload cinematic MP4 artifact
