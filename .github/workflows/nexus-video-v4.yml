@@ -161,7 +161,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: nexus-v4-${{ steps.request.outputs.request_id }}
-          path: output/${{ env.REQUEST_ID }}
+          path: output/${{ steps.request.outputs.request_id }}/
           github-token: ${{ secrets.GITHUB_TOKEN }}
           repository: ${{ github.repository }}
           run-id: ${{ inputs.source_run_id }}
