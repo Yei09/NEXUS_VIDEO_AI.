@@ -188,6 +188,7 @@ jobs:
           test -s "$output_dir/audios/music.wav"
           test -s "$output_dir/audios/effects.wav"
           test -s "$output_dir/audios/audio_mix.wav"
+          test -s "$output_dir/reports/audio_sync_report.json"
           test -s "$output_dir/frames/contact_sheet.jpg"
           frame_count="$(find "$output_dir/frames" -maxdepth 1 -type f -name 'scene-*.jpg' | wc -l)"
           test "$frame_count" -eq 6
