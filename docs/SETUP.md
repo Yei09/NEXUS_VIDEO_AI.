@@ -18,7 +18,7 @@ El producto genera historias originales de terror en español para Shorts, Reels
 5. Descarga el artefacto nexus-horror-story-test.
 6. Revisa output/metadata.json y output/script.txt incluidos en el ZIP.
 
-El motor usa Piper TTS en español, crea ilustraciones de escenas con Python/Pillow y sintetiza un ambiente de terror original con FFmpeg. Valida H.264, AAC, 1080×1920 y duración de 25–60 segundos. La duración exacta depende de la velocidad de narración y el guion; si queda fuera del rango, la ejecución falla para no entregar un vídeo que incumpla.
+El motor usa Piper TTS en español, crea ilustraciones de escenas con Python/Pillow y sintetiza un ambiente de terror original con FFmpeg. Valida H.264, AAC, 1080×1920 y duración de 30–60 segundos. La duración exacta depende de la velocidad de narración y el guion; si queda fuera del rango, la ejecución falla para no entregar un vídeo que incumpla.
 
 ## Google Drive (opcional)
 Para subir a Mi unidad se usa OAuth de tu cuenta:
