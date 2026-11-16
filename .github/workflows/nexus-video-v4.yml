@@ -224,7 +224,7 @@ jobs:
           assert motion.get("scene_diversity_threshold") == 7.0, "Diversity threshold was changed"
           layers=motion.get("independent_layer_manifest", [])
           assert len(layers) == 6, "Missing independent layer manifest for six scenes"
-          assert all(len(scene_layers) >= 1 for scene_layers in layers), "A scene has no independent layers"
+          assert all(len(scene_layers) >= 2 for scene_layers in layers), "A scene lacks an action layer separate from its background plane"
           metrics=motion.get("scene_metrics", [])
           assert len(metrics) == 6, "Expected six scene motion records"
           assert all(len(m.get("independent_layer_motion_samples", [])) == 3 for m in metrics), "Missing start/mid/end independent layer traces"
