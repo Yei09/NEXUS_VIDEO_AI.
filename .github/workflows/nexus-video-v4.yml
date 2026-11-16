@@ -167,6 +167,12 @@ jobs:
           PAUSE_SECONDS: ${{ env.PAUSE_SECONDS }}
           NARRATION_INTENSITY: ${{ env.NARRATION_INTENSITY }}
           VOICE_AUDITIONS: ${{ env.VOICE_AUDITIONS }}
+          MAKE_RESULT_WEBHOOK_URL: ${{ secrets.MAKE_RESULT_WEBHOOK_URL }}
+          MAKE_WEBHOOK_API_KEY: ${{ secrets.MAKE_WEBHOOK_API_KEY }}
+          ARTIFACT_NAME: nexus-v4-${{ steps.request.outputs.request_id }}
+          GITHUB_RUN_ID: ${{ github.run_id }}
+          GITHUB_SERVER_URL: ${{ github.server_url }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
         run: |
           python -m py_compile nexus_video/story_v4.py nexus_video/engine_v4.py nexus_video/drive_v4.py nexus_video/notify_make_v4.py tests/test_story_v4.py
           python -m unittest discover -s tests -v
@@ -188,11 +194,11 @@ jobs:
           path: output/${{ steps.request.outputs.request_id }}/
           if-no-files-found: warn
           retention-days: 14
-      - name: Notify Make that render finished
-        if: ${{ steps.render.outcome == 'success' }}
+      - name: Notify Make that Drive upload started
+        if: ${{ (inputs.operation == 'render' && steps.render.outcome == 'success') || inputs.operation == 'upload_only' }}
         continue-on-error: true
         env:
-          NEXUS_STATUS: rendered
+          NEXUS_STATUS: uploading_drive
           REQUEST_ID: ${{ steps.request.outputs.request_id }}
           ARTIFACT_NAME: nexus-v4-${{ steps.request.outputs.request_id }}
           MAKE_RESULT_WEBHOOK_URL: ${{ secrets.MAKE_RESULT_WEBHOOK_URL }}
