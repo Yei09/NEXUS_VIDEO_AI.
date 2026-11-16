@@ -149,6 +149,29 @@ def concat_wavs(parts, out):
     run(["ffmpeg", "-y", "-f", "concat", "-safe", "0", "-i", str(listing), "-c:a", "pcm_s16le", str(out)])
     listing.unlink(missing_ok=True)
 
+
+def allocate_pause_durations(speech_lengths, target_seconds, requested_pause, intensity):
+    """Distribute remaining runtime across story boundaries without altering speech speed."""
+    if not speech_lengths:
+        raise ValueError("Se necesita al menos un segmento de narración.")
+    if requested_pause <= 0:
+        raise ValueError("requested_pause debe ser positivo.")
+    boundary_count = len(speech_lengths) - 1
+    available = float(target_seconds) - sum(float(x) for x in speech_lengths)
+    if boundary_count == 0:
+        if abs(available) > 0.15:
+            raise ValueError("No hay límites narrativos suficientes para ajustar la duración.")
+        return []
+    if available < boundary_count * 0.20:
+        raise ValueError(
+            f"La voz ocupa {sum(speech_lengths):.3f}s y no deja pausas naturales suficientes "
+            f"para alcanzar {target_seconds:.3f}s."
+        )
+    weight = requested_pause * (0.67 if intensity == "urgent" else 1.0)
+    pauses = [available / boundary_count for _ in range(boundary_count)]
+    pauses[-1] += available - sum(pauses)
+    return pauses
+
 def create_audio_beds(events, starts, total_seconds, sample_rate, music_path, effects_path, intensity):
     count = int(math.ceil(total_seconds * sample_rate))
     rng = random.Random("nexus-v4-audio")
@@ -602,6 +625,8 @@ def write_reports(out, story, events, scene_metrics, first_frames, starts, lengt
         "valid": bool(video and audio and video.get("codec_name") == "h264" and audio.get("codec_name") == "aac"
                       and video.get("width") == W and video.get("height") == H
                       and video.get("r_frame_rate") == "30/1" and 30 <= duration <= 60
+                      and abs(duration-request["duration_target"]) <= 0.15
+                      and abs(media_duration(narration)-request["duration_target"]) <= 0.15
                       and abs(duration-media_duration(audio_mix)) <= 0.15
                       and motion_pass and diversity_pass),
         "duration_seconds": round(duration, 3), "width": video.get("width"), "height": video.get("height"),
@@ -610,6 +635,8 @@ def write_reports(out, story, events, scene_metrics, first_frames, starts, lengt
         "video_size_bytes": mp4.stat().st_size, "narration_duration_seconds": round(media_duration(narration), 3),
         "audio_mix_duration_seconds": round(media_duration(audio_mix), 3),
         "audio_video_duration_delta_seconds": round(abs(duration-media_duration(audio_mix)), 3),
+        "requested_duration_seconds": request["duration_target"],
+        "duration_error_seconds": round(abs(duration-request["duration_target"]), 3),
         "narration_file": narration.name, "audio_mix_file": audio_mix.name,
         "ffprobe_format": probe.get("format", {}).get("format_name"),
     }
@@ -628,6 +655,7 @@ def write_reports(out, story, events, scene_metrics, first_frames, starts, lengt
         "voice": request["voice"], "voice_rate": request["voice_rate"],
         "pitch_semitones": request["pitch_semitones"], "voice_volume": request["voice_volume"],
         "pause_seconds": request["pause_seconds"], "duration_target_seconds": request["duration_target"],
+        "duration_error_seconds": round(abs(duration-request["duration_target"]), 3),
         "narration_intensity": request["intensity"],
         "duration_seconds": round(duration, 3), "width": W, "height": H, "fps": FPS,
         "video_codec": "h264", "audio_codec": "aac", "scene_count": len(events),
@@ -702,14 +730,16 @@ def main():
                            request["voice_rate"], request["pitch_semitones"], request["intensity"])
         narration_dir = out/"audios"
         narration_dir.mkdir(exist_ok=True)
-        speech_parts, lengths, pauses = [], [], []
+        speech_parts, lengths = [], []
         for i, event in enumerate(story["events"]):
             wav = work/f"speech-{i:02d}.wav"
             synthesize(event["text"], voice, wav, work, request["voice_rate"],
                        request["pitch_semitones"], request["intensity"])
             speech_parts.append(wav)
             lengths.append(media_duration(wav))
-            pauses.append(request["pause_seconds"] if request["intensity"] != "urgent" else request["pause_seconds"]*0.67)
+        pauses = allocate_pause_durations(
+            lengths, request["duration_target"], request["pause_seconds"], request["intensity"]
+        )
         with wave.open(str(speech_parts[0]), "rb") as f:
             sample_rate, channels, sample_width = f.getframerate(), f.getnchannels(), f.getsampwidth()
         audio_parts = []
@@ -726,8 +756,8 @@ def main():
         narration = narration_dir/"narration.wav"
         concat_wavs(audio_parts, narration)
         total = media_duration(narration)
-        if not 30 <= total <= 60:
-            raise RuntimeError(f"La narración dura {total:.1f}s; se requiere 30–60s. Ajusta voice_rate o el guion.")
+        if abs(total - request["duration_target"]) > 0.15:
+            raise RuntimeError(f"La narración quedó en {total:.3f}s; objetivo {request['duration_target']}s (tolerancia 0.15s).")
         lengths_for_captions = [lengths[i] for i in range(len(lengths))]
         notify_progress("scenes_rendering")
         clips, first_frames, scene_metrics = [], [], []
@@ -773,7 +803,7 @@ def main():
         create_audio_beds(story["events"], starts, total, sample_rate, music, effects, request["intensity"])
         notify_progress("audio_mixing")
         audio_mix = narration_dir/"audio_mix.wav"
-        mix_filter = f"[0:a]highpass=f=70,lowpass=f=11500,acompressor=threshold=0.12:ratio=2.1:attack=18:release=180,volume={request['voice_volume']:.3f}[voice];[1:a]volume=0.34[music];[2:a]volume=0.55[fx];[voice][music][fx]amix=inputs=3:duration=first:weights='1 0.28 0.42',loudnorm=I=-16:TP=-1.5:LRA=10[mix]"
+        mix_filter = f"[0:a]highpass=f=70,lowpass=f=11500,acompressor=threshold=0.12:ratio=2.1:attack=18:release=180,volume={request['voice_volume']:.3f}[voice];[1:a]volume=0.34[music0];[music0][voice]sidechaincompress=threshold=0.025:ratio=5:attack=25:release=420[music];[2:a]volume=0.55[fx];[voice][music][fx]amix=inputs=3:duration=first:weights='1 0.28 0.42',loudnorm=I=-16:TP=-1.5:LRA=10[mix]"
         run(["ffmpeg", "-y", "-i", str(narration), "-i", str(music), "-i", str(effects),
              "-filter_complex", mix_filter, "-map", "[mix]", "-c:a", "pcm_s16le", str(audio_mix)])
         video_dir = out/"videos"
