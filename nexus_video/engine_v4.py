@@ -213,7 +213,8 @@ def scene_background(scene, variant):
         color = tuple(int(top[k] * (1-mix) + bottom[k] * mix) for k in range(3))
         d.rectangle((0, y, BASE_W, y+8), fill=(*color, 255))
     # Practical light and depth cues.
-    d.ellipse((BASE_W*0.58, 80, BASE_W*1.10, 560), fill=(190, 174, 132, 20))
+    d.ellipse((BASE_W*0.58 + (variant % 5)*7, 80, BASE_W*1.10, 560), fill=(190, 174, 132, 20))
+    d.rectangle((35 + (variant % 4)*24, 185, 75 + (variant % 4)*24, 310), fill=(85, 105, 120, 28), outline=(125, 140, 150, 75), width=2)
     d.rectangle((0, BASE_H-170, BASE_W, BASE_H), fill=(3, 4, 8, 210))
     if scene in ("phone_room", "receiver_close", "floor_cable", "mobile_close"):
         d.polygon([(0, 570), (BASE_W//2, 470), (BASE_W, 570), (BASE_W, BASE_H), (0, BASE_H)], fill=(13, 13, 19, 255))
@@ -362,7 +363,7 @@ def image_difference(a, b):
     diff = ImageChops.difference(a.convert("RGB"), b.convert("RGB"))
     return sum(ImageStat.Stat(diff).mean) / 3.0
 
-def render_scene(event, seconds, work, index):
+def render_scene(event, seconds, work, index, variant_offset=0):
     frame_count = max(45, int(math.ceil(seconds*RENDER_FPS)))
     scene_dir = work / f"scene-{index:02d}"
     scene_dir.mkdir(parents=True, exist_ok=True)
@@ -372,7 +373,7 @@ def render_scene(event, seconds, work, index):
     for attempt in range(3):
         for old in scene_dir.glob("frame-*.jpg"):
             old.unlink()
-        seed = 7019 + index*997 + attempt*137
+        seed = 7019 + index*997 + attempt*137 + variant_offset*1009
         for n in range(frame_count):
             frame = render_frame(event, n/max(1, frame_count-1), n, frame_count, seed)
             frame.save(scene_dir/f"frame-{n:04d}.jpg", quality=88)
@@ -555,14 +556,26 @@ def main():
         lengths_for_captions = [lengths[i] for i in range(len(lengths))]
         clips, first_frames, scene_metrics = [], [], []
         for i, event in enumerate(story["events"]):
-            clip, first, metric = render_scene(event, lengths[i]+pauses[i], work, i)
+            clip, first, metric = render_scene(event, lengths[i]+(pauses[i] if i < len(pauses)-1 else 0), work, i)
             clips.append(clip)
             first_frames.append(first)
             scene_metrics.append(metric)
         pair_diffs = [image_difference(first_frames[i], first_frames[j])
                       for i in range(len(first_frames)) for j in range(i+1, len(first_frames))]
+        # Limited visual-regeneration pass: vary the composition seed for the weaker member of any pair.
+        for diversity_attempt in range(1, 3):
+            weak_pairs = [(i, j) for i in range(len(first_frames)) for j in range(i+1, len(first_frames))
+                          if image_difference(first_frames[i], first_frames[j]) < 7.0]
+            if not weak_pairs:
+                break
+            weak_index = weak_pairs[0][1]
+            clips[weak_index], first_frames[weak_index], scene_metrics[weak_index] = render_scene(
+                story["events"][weak_index], lengths[weak_index]+(pauses[weak_index] if weak_index < len(pauses)-1 else 0),
+                work, weak_index, variant_offset=diversity_attempt)
+        pair_diffs = [image_difference(first_frames[i], first_frames[j])
+                      for i in range(len(first_frames)) for j in range(i+1, len(first_frames))]
         if any(v < 7.0 for v in pair_diffs):
-            raise RuntimeError("La diversidad entre dos escenas no alcanzó el umbral; se detiene el render para evitar escenas repetidas.")
+            raise RuntimeError("La diversidad entre escenas siguió por debajo del umbral tras 2 regeneraciones; render detenido.")
         concat_file = work/"video-scenes.txt"
         concat_file.write_text("".join(f"file '{p.resolve()}'\n" for p in clips), encoding="utf-8")
         silent_video = work/"silent-video.mp4"
