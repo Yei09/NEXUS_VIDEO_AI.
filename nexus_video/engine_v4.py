@@ -653,7 +653,6 @@ def write_reports(out, story, events, scene_metrics, first_frames, starts, lengt
         "audio_mix_duration_seconds": round(media_duration(audio_mix), 3),
         "audio_video_duration_delta_seconds": round(abs(duration-media_duration(audio_mix)), 3),
         "requested_duration_seconds": request["duration_target"],
-        "scene_timeline_duration_seconds": round(scene_timeline_total, 3),
         "duration_error_seconds": round(abs(duration-request["duration_target"]), 3),
         "narration_file": narration.name, "audio_mix_file": audio_mix.name,
         "ffprobe_format": probe.get("format", {}).get("format_name"),
