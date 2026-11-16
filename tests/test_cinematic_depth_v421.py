@@ -34,14 +34,20 @@ class CinematicDepthV421Tests(unittest.TestCase):
         a, layers_a = render_depth_scene(self.base, event, .1, 3, 90, 7019)
         b, layers_b = render_depth_scene(self.base, event, .9, 80, 90, 7019)
         self.assertIn("door_leaf", [x["name"] for x in layers_a])
-        self.assertGreater(ImageChops.difference(a, b).getbbox() is not None, 0)
-        self.assertEqual(layers_a, layers_b)
+        door_a = next(x for x in layers_a if x["name"] == "door_leaf")
+        door_b = next(x for x in layers_b if x["name"] == "door_leaf")
+        self.assertNotEqual(door_a["rotation_degrees"], door_b["rotation_degrees"])
+        self.assertIsNotNone(ImageChops.difference(a, b).getbbox())
 
     def test_character_animation_is_separate_from_background(self):
         event = {"action": "walk_down", "camera": "lateral_track"}
         a, layers = render_depth_scene(self.base, event, .1, 3, 90, 7019)
         b, _ = render_depth_scene(self.base, event, .8, 70, 90, 7019)
         self.assertIn("character", [x["name"] for x in layers])
+        actor_a = next(x for x in layers if x["name"] == "character")
+        _, later_layers = render_depth_scene(self.base, event, .8, 70, 90, 7019)
+        actor_b = next(x for x in later_layers if x["name"] == "character")
+        self.assertNotEqual(actor_a["alpha_bounds"], actor_b["alpha_bounds"])
         self.assertIsNotNone(ImageChops.difference(a, b).getbbox())
 
     def test_cast_shadow_moves_only_for_narrative_shadow_events(self):
