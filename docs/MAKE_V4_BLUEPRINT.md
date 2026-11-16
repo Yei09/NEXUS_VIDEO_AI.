@@ -102,7 +102,11 @@ Crea un Fine-grained personal access token limitado al repositorio Yei09/NEXUS_V
 3. Actualiza status, stage, run_id, run_url, artifact_name, metadata, drive links, error y updated_at.
 4. Normaliza:
    - processing → status=processing, stage=rendering
-   - rendered → status=processing, stage=drive_upload
+   - story_created → status=processing, stage=story_created
+   - narrating → status=processing, stage=narrating
+   - scenes_rendering → status=processing, stage=scenes_rendering
+   - audio_mixing → status=processing, stage=audio_mixing
+   - rendered o uploading_drive → status=processing, stage=drive_upload
    - completed → status=completed, stage=done
    - drive_upload_failed o error → status=error, stage=drive_upload_failed o render_failed.
 5. Webhook Response HTTP 200 con JSON { "accepted": true, "request_id": "{{request_id}}" }.
