@@ -104,12 +104,11 @@ jobs:
       PAUSE_SECONDS: ${{ inputs.pause_seconds }}
       NARRATION_INTENSITY: ${{ inputs.narration_intensity }}
       VOICE_AUDITIONS: ${{ inputs.voice_auditions }}
-      DRIVE_CONFIGURED: ${{ secrets.GOOGLE_OAUTH_CLIENT_JSON != '' && secrets.GOOGLE_OAUTH_REFRESH_TOKEN != '' }}
     steps:
       - name: Validate dispatch branch and print GitHub context
         shell: bash
         env:
-          EXPECTED_REF: refs/heads/v4.2-cinematic
+          EXPECTED_REF: refs/heads/v4.2.1-cinematic-depth
         run: |
           echo "github.event_name=$GITHUB_EVENT_NAME"
           echo "github.ref=$GITHUB_REF"
@@ -119,13 +118,13 @@ jobs:
             exit 1
           fi
           if [[ "$GITHUB_REF" != "$EXPECTED_REF" ]]; then
-            echo "::error title=Wrong branch::Select v4.2-cinematic in the Run workflow branch selector. No production code was checked out."
+            echo "::error title=Wrong branch::Select v4.2.1-cinematic-depth in the Run workflow branch selector. No production code was checked out."
             exit 1
           fi
-      - name: Checkout V4 branch
+      - name: Checkout V4.2.1 branch
         uses: actions/checkout@v4
         with:
-          ref: v4.2-cinematic
+          ref: v4.2.1-cinematic-depth
       - name: Install FFmpeg and fonts
         run: |
           sudo apt-get update
@@ -167,13 +166,11 @@ jobs:
           NEXUS_STATUS: processing
           REQUEST_ID: ${{ steps.request.outputs.request_id }}
           ARTIFACT_NAME: nexus-v4-${{ steps.request.outputs.request_id }}
-          MAKE_RESULT_WEBHOOK_URL: ${{ secrets.MAKE_RESULT_WEBHOOK_URL }}
-          MAKE_WEBHOOK_API_KEY: ${{ secrets.MAKE_WEBHOOK_API_KEY }}
           GITHUB_RUN_ID: ${{ github.run_id }}
           GITHUB_SERVER_URL: ${{ github.server_url }}
           GITHUB_REPOSITORY: ${{ github.repository }}
         run: python -m nexus_video.notify_make_v4
-      - name: Render V4 video
+      - name: Render V4.2.1 video
         id: render
         if: ${{ inputs.operation == 'render' }}
         env:
@@ -187,32 +184,30 @@ jobs:
           PAUSE_SECONDS: ${{ env.PAUSE_SECONDS }}
           NARRATION_INTENSITY: ${{ env.NARRATION_INTENSITY }}
           VOICE_AUDITIONS: ${{ env.VOICE_AUDITIONS }}
-          MAKE_RESULT_WEBHOOK_URL: ${{ secrets.MAKE_RESULT_WEBHOOK_URL }}
-          MAKE_WEBHOOK_API_KEY: ${{ secrets.MAKE_WEBHOOK_API_KEY }}
           ARTIFACT_NAME: nexus-v4-${{ steps.request.outputs.request_id }}
           GITHUB_RUN_ID: ${{ github.run_id }}
           GITHUB_SERVER_URL: ${{ github.server_url }}
           GITHUB_REPOSITORY: ${{ github.repository }}
         run: |
-          python -m py_compile nexus_video/story_v4.py nexus_video/engine_v4.py nexus_video/cinematic_v42.py nexus_video/drive_v4.py nexus_video/notify_make_v4.py tests/test_story_v4.py tests/test_engine_v4.py tests/test_cinematic_v42.py tools/compare_v41_v42.py
+          python -m py_compile nexus_video/story_v4.py nexus_video/engine_v4.py nexus_video/cinematic_v42.py nexus_video/cinematic_depth_v421.py tests/test_story_v4.py tests/test_engine_v4.py tests/test_cinematic_v42.py tests/test_cinematic_depth_v421.py tools/compare_v42_v421.py
           python -m unittest discover -s tests -v
           python -m nexus_video.engine_v4
-      - name: Download protected V4.1 baseline artifact
+      - name: Download protected V4.2 baseline artifact
         if: ${{ inputs.operation == 'render' && steps.render.outcome == 'success' }}
         uses: actions/download-artifact@v4
         with:
-          name: nexus-v4-7ce296df-e7fd-41ad-8dcc-a09ef98d63d3
+          name: nexus-v4-d8effcfb-cbdd-4e1f-ba08-d784bf1c681f
           path: baseline-v4.1
           github-token: ${{ secrets.GITHUB_TOKEN }}
           repository: ${{ github.repository }}
-          run-id: 43819913441
-      - name: Compare six encoded scenes against V4.1
+          run-id: 43821467642
+      - name: Compare six encoded scenes against V4.2
         if: ${{ inputs.operation == 'render' && steps.render.outcome == 'success' }}
         run: |
-          python tools/compare_v41_v42.py baseline-v4.1 output/$REQUEST_ID output/$REQUEST_ID/comparison
+          python tools/compare_v42_v421.py baseline-v4.2 output/$REQUEST_ID output/$REQUEST_ID/comparison
           test -s output/$REQUEST_ID/comparison/comparison_report.json
-          test -s output/$REQUEST_ID/comparison/v4.1-vs-v4.2-contact-sheet.jpg
-      - name: Verify rendered MP4 and audio deliverables
+          test -s output/$REQUEST_ID/comparison/v4.2-vs-v4.2.1-contact-sheet.jpg
+      - name: Verify rendered V4.2.1 MP4 and audio deliverables
         if: ${{ inputs.operation == 'render' }}
         shell: bash
         run: |
@@ -266,7 +261,7 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           repository: ${{ github.repository }}
           run-id: ${{ inputs.source_run_id }}
-      - name: Preserve output as GitHub artifact before Drive upload
+      - name: Preserve V4.2.1 output as GitHub artifact
         if: ${{ always() }}
         uses: actions/upload-artifact@v4
         with:
@@ -281,8 +276,6 @@ jobs:
           NEXUS_STATUS: uploading_drive
           REQUEST_ID: ${{ steps.request.outputs.request_id }}
           ARTIFACT_NAME: nexus-v4-${{ steps.request.outputs.request_id }}
-          MAKE_RESULT_WEBHOOK_URL: ${{ secrets.MAKE_RESULT_WEBHOOK_URL }}
-          MAKE_WEBHOOK_API_KEY: ${{ secrets.MAKE_WEBHOOK_API_KEY }}
           GITHUB_RUN_ID: ${{ github.run_id }}
           GITHUB_SERVER_URL: ${{ github.server_url }}
           GITHUB_REPOSITORY: ${{ github.repository }}
@@ -292,9 +285,6 @@ jobs:
         if: ${{ ((inputs.operation == 'render' && steps.render.outcome == 'success') || inputs.operation == 'upload_only') && env.DRIVE_CONFIGURED == 'true' }}
         env:
           REQUEST_ID: ${{ steps.request.outputs.request_id }}
-          GOOGLE_OAUTH_CLIENT_JSON: ${{ secrets.GOOGLE_OAUTH_CLIENT_JSON }}
-          GOOGLE_OAUTH_REFRESH_TOKEN: ${{ secrets.GOOGLE_OAUTH_REFRESH_TOKEN }}
-          GOOGLE_DRIVE_ROOT_NAME: NEXUS VIDEO AI
         run: |
           mkdir -p "output/$REQUEST_ID/errors"
           set -o pipefail
@@ -314,8 +304,6 @@ jobs:
           NEXUS_STATUS: ${{ steps.drive.outcome == 'success' && 'completed' || steps.drive.outcome == 'failure' && 'drive_upload_failed' || (inputs.operation == 'render' && steps.render.outcome == 'success' && 'rendered') || (inputs.operation == 'render' && steps.render.outcome == 'failure' && 'render_failed') || 'error' }}
           REQUEST_ID: ${{ steps.request.outputs.request_id }}
           ARTIFACT_NAME: nexus-v4-${{ steps.request.outputs.request_id }}
-          MAKE_RESULT_WEBHOOK_URL: ${{ secrets.MAKE_RESULT_WEBHOOK_URL }}
-          MAKE_WEBHOOK_API_KEY: ${{ secrets.MAKE_WEBHOOK_API_KEY }}
           GITHUB_RUN_ID: ${{ github.run_id }}
           GITHUB_SERVER_URL: ${{ github.server_url }}
           GITHUB_REPOSITORY: ${{ github.repository }}
