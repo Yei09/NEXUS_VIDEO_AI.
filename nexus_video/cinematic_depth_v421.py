@@ -138,8 +138,10 @@ def compose_scene_layers(background, layers, camera_target=None, focus_depth=.55
     ordered=sorted(layers,key=lambda item:item.depth)
     for layer in ordered:
         sprite=layer.image.convert("RGBA")
-        if layer.blur>0:
-            sprite=sprite.filter(ImageFilter.GaussianBlur(layer.blur))
+        focus_blur=abs(layer.depth-focus_depth)*layer.focus_weight*2.0
+        total_blur=layer.blur+focus_blur
+        if total_blur>0:
+            sprite=sprite.filter(ImageFilter.GaussianBlur(total_blur))
         if layer.rotation:
             sprite=sprite.rotate(layer.rotation,resample=Image.Resampling.BICUBIC,expand=True)
         if layer.scale!=1.0:
@@ -168,7 +170,8 @@ def render_depth_scene(base_image, event, t, frame_no, total_frames, seed):
     target=(0.0, 0.0)
     if event.get("camera") in {"lateral_track","push_in"}:
         target=(math.sin(t*math.pi)*size[0]*.035, -t*size[1]*.012)
-    return compose_scene_layers(base_image,layers,camera_target=target), [
+    focus_depth=.78 if event.get("action") in {"phone_ring","receiver_lift","screen_call","door_open","cable_crawl"} else .58
+    return compose_scene_layers(base_image,layers,camera_target=target,focus_depth=focus_depth), [
         {"name":x.name,"depth":round(x.depth,3),"independent_transform":True,
          "camera_weight":x.camera_weight,"blur":x.blur} for x in layers
     ]
