@@ -1,0 +1,68 @@
+name: NEXUS Video - Cinematic V3 Manual Test
+on:
+  workflow_dispatch:
+    inputs:
+      voice:
+        description: Voz para la narración principal (las cuatro muestras se generan siempre)
+        type: choice
+        required: true
+        default: es_MX-claude-high
+        options:
+          - es_MX-claude-high
+          - es_MX-ald-medium
+          - es_ES-davefx-medium
+          - es_ES-sharvard-medium
+permissions:
+  contents: read
+concurrency:
+  group: nexus-video-cinematic-v3-manual
+  cancel-in-progress: false
+jobs:
+  render:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install FFmpeg and fonts
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg fonts-dejavu-core
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+      - name: Check Python syntax
+        run: python -m py_compile nexus_video/engine_v3.py
+      - name: Render one narrative short film and voice auditions
+        env:
+          PIPER_VOICE: \${{ inputs.voice }}
+        run: python -m nexus_video.engine_v3
+      - name: Validate scene diversity and motion frames
+        run: |
+          python - <<'PY'
+          import json, glob, os, subprocess
+          m=json.load(open("output/metadata.json",encoding="utf-8"))
+          assert m["scene_count"] >= 5
+          assert len(set(m["scene_types"])) == m["scene_count"], m["scene_types"]
+          assert m["width"] == 1080 and m["height"] == 1920 and m["fps"] == 30
+          assert 30 <= m["duration_seconds"] <= 60
+          assert len(glob.glob("output/voice-samples/*.wav")) == 4
+          assert os.path.getsize("output/narration.wav") > 100000
+          print("Scene diversity, duration, format and voice audition files verified.")
+          PY
+      - name: Upload MP4, clean narration, voice auditions and metadata
+        uses: actions/upload-artifact@v4
+        with:
+          name: nexus-cinematic-v3-manual-test
+          path: |
+            output/*.mp4
+            output/narration.wav
+            output/voice-samples/*.wav
+            output/metadata.json
+            output/script.txt
+          if-no-files-found: error
+          retention-days: 14
