@@ -194,7 +194,7 @@ jobs:
           GITHUB_SERVER_URL: ${{ github.server_url }}
           GITHUB_REPOSITORY: ${{ github.repository }}
         run: |
-          python -m py_compile nexus_video/story_v4.py nexus_video/engine_v4.py nexus_video/drive_v4.py nexus_video/notify_make_v4.py tests/test_story_v4.py
+          python -m py_compile nexus_video/story_v4.py nexus_video/engine_v4.py nexus_video/drive_v4.py nexus_video/notify_make_v4.py tests/test_story_v4.py tests/test_engine_v4.py
           python -m unittest discover -s tests -v
           python -m nexus_video.engine_v4
       - name: Verify rendered MP4 and audio deliverables
