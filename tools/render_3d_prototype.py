@@ -29,10 +29,10 @@ def main():
  out=Path(a.out).resolve(); frames=out/"frames"; frames.mkdir(parents=True,exist_ok=True)
  blender=shutil.which("blender"); ffmpeg=shutil.which("ffmpeg")
  if not blender or not ffmpeg: raise SystemExit("Missing Blender or FFmpeg")
- synth_audio(out)
+ prep_started=time.perf_counter(); synth_audio(out)
  script=Path(__file__).resolve().parents[1]/"nexus_video3d"/"scene_factory.py"
  env=os.environ.copy(); env.update(NEXUS_RENDER_OUT=str(frames),NEXUS_SAMPLES=str(a.samples))
- start=time.perf_counter(); run([blender,"-b","-t","2","--python",str(script)],env=env); render=time.perf_counter()-start
+ run([blender,"-b","-t","2","--python",str(script)],env=env); timing=json.loads((out/"blender_timing.json").read_text()); render=float(timing["render_seconds"]); preparation=float(timing["preparation_seconds"]) + (time.perf_counter()-prep_started-render-float(timing["preparation_seconds"]))
  mp4=out/"nexus_blender3d_10s.mp4"
  run([ffmpeg,"-y","-loglevel","error","-framerate","30","-i",str(frames/"frame_%04d.png"),"-i",str(out/"audio_master.wav"),"-frames:v","300","-vf","format=yuv420p","-c:v","libx264","-preset","veryfast","-crf","22","-r","30","-c:a","aac","-b:a","160k","-t","10","-movflags","+faststart",str(mp4)])
  # Six keyframes plus consecutive proof sequences around walking, door, and shadow.
@@ -41,6 +41,6 @@ def main():
   for i,t in enumerate(times):
    run([ffmpeg,"-y","-loglevel","error","-ss",str(t),"-i",str(mp4),"-frames:v","1",str(dest/f"{i+1:02d}.jpg")])
  usage=resource.getrusage(resource.RUSAGE_CHILDREN).ru_maxrss
- report={"engine":"Blender Cycles CPU","render_seconds":round(render,2),"peak_child_rss_kb":usage,"video_bytes":mp4.stat().st_size,"frames":300,"target_duration_seconds":10,"install_seconds":float(os.getenv("NEXUS_INSTALL_SECONDS","0")),"preparation_seconds":0,"fps_production":round(300/render,3),"samples":a.samples}
+ report={"engine":"Blender Cycles CPU","render_seconds":round(render,2),"peak_child_rss_kb":usage,"video_bytes":mp4.stat().st_size,"frames":300,"target_duration_seconds":10,"install_seconds":float(os.getenv("NEXUS_INSTALL_SECONDS","0")),"preparation_seconds":round(preparation,2),"fps_production":round(300/render,3),"samples":a.samples}
  (out/"performance_report.json").write_text(json.dumps(report,indent=2))
 if __name__=="__main__": main()
