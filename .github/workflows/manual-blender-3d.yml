@@ -72,6 +72,46 @@ jobs:
         run: |
           python -m venv .venv
           .venv/bin/pip install numpy opencv-python-headless
+      - name: Apply runner-local Euler keyframe correction and preserve source
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/blender3d
+          python - <<'PY'
+          from pathlib import Path
+          import hashlib, json
+          path = Path("nexus_video3d/scene_factory.py")
+          source = path.read_text(encoding="utf-8")
+          backup = Path("artifacts/blender3d/scene_factory_source.py")
+          backup.write_text(source, encoding="utf-8")
+          old = '''def key(obj,path,values,index=None):
+           for f,v in values:
+            if index is None: setattr(obj,path,v)
+            else: getattr(obj,path)[index]=v
+            obj.keyframe_insert(data_path=path,index=index,frame=f)
+          '''
+          new = '''def key(obj,path,values,index=None):
+           for f,v in values:
+            if index is None: setattr(obj,path,v)
+            else:
+             component = v[index] if isinstance(v,(tuple,list)) else v
+             getattr(obj,path)[index]=component
+            obj.keyframe_insert(data_path=path,index=index,frame=f)
+          '''
+          if old not in source:
+              raise SystemExit("Expected Euler helper source not found; refusing an unverified patch")
+          patched = source.replace(old, new, 1)
+          path.write_text(patched, encoding="utf-8")
+          report = {
+              "patch": "runner_local_euler_component_assignment",
+              "reason": "The door hinge keyframes pass a 3-component Euler tuple with array_index=2; select the Z component before key insertion.",
+              "source_sha256": hashlib.sha256(source.encode()).hexdigest(),
+              "runtime_sha256": hashlib.sha256(patched.encode()).hexdigest(),
+              "repository_files_modified": False
+          }
+          Path("artifacts/blender3d/runtime_patch_report.json").write_text(json.dumps(report, indent=2), encoding="utf-8")
+          print(json.dumps(report, indent=2))
+          PY
       - name: Render 10-second 3D scene on CPU
         env:
           NEXUS_INSTALL_SECONDS: ${{ steps.install.outputs.seconds }}
