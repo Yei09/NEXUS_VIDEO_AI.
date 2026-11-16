@@ -66,6 +66,15 @@ def ffprobe(path):
 def media_duration(path):
     return float(ffprobe(path)["format"]["duration"])
 
+def notify_progress(stage):
+    if not os.getenv("MAKE_RESULT_WEBHOOK_URL") or not os.getenv("MAKE_WEBHOOK_API_KEY"):
+        return
+    try:
+        from .notify_make_v4 import send
+        send(stage, {"stage": stage})
+    except Exception as exc:
+        print(f"Make progress callback warning ({stage}): {exc}", file=sys.stderr)
+
 def load_font(size):
     candidates = [
         "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
@@ -528,7 +537,9 @@ def main():
     (out/"script.txt").write_text("\n".join(e["text"] for e in story["events"]), encoding="utf-8")
     (out/"story_events.json").write_text(json.dumps(story, ensure_ascii=False, indent=2), encoding="utf-8")
     (out/"errors").mkdir(exist_ok=True)
+    notify_progress("story_created")
     try:
+        notify_progress("narrating")
         if request["voice_auditions"]:
             sample_dir = out/"audios"/"voice_samples"
             sample_dir.mkdir(parents=True, exist_ok=True)
@@ -565,6 +576,7 @@ def main():
         if not 30 <= total <= 60:
             raise RuntimeError(f"La narración dura {total:.1f}s; se requiere 30–60s. Ajusta voice_rate o el guion.")
         lengths_for_captions = [lengths[i] for i in range(len(lengths))]
+        notify_progress("scenes_rendering")
         clips, first_frames, scene_metrics = [], [], []
         for i, event in enumerate(story["events"]):
             clip, first, metric = render_scene(event, lengths[i]+(pauses[i] if i < len(pauses)-1 else 0), work, i)
@@ -596,6 +608,7 @@ def main():
         write_subtitles(story["events"], starts, lengths_for_captions, subtitles)
         music, effects = narration_dir/"music.wav", narration_dir/"effects.wav"
         create_audio_beds(story["events"], starts, total, sample_rate, music, effects, request["intensity"])
+        notify_progress("audio_mixing")
         audio_mix = narration_dir/"audio_mix.wav"
         mix_filter = f"[0:a]highpass=f=70,lowpass=f=11500,acompressor=threshold=0.12:ratio=2.1:attack=18:release=180,volume={request['voice_volume']:.3f}[voice];[1:a]volume=0.34[music];[2:a]volume=0.55[fx];[voice][music][fx]amix=inputs=3:duration=first:weights='1 0.28 0.42',loudnorm=I=-16:TP=-1.5:LRA=10[mix]"
         run(["ffmpeg", "-y", "-i", str(narration), "-i", str(music), "-i", str(effects),
@@ -622,6 +635,7 @@ def main():
         metadata["files"]["narration"] = str(narration.relative_to(out))
         metadata["files"]["audio_mix"] = str(audio_mix.relative_to(out))
         (out/"metadata.json").write_text(json.dumps(metadata, ensure_ascii=False, indent=2), encoding="utf-8")
+        notify_progress("rendered")
         print(json.dumps(metadata, ensure_ascii=False, indent=2))
         print(f"V4_RENDER_OK request_id={request_id} duration={metadata['duration_seconds']}")
     except Exception as exc:
