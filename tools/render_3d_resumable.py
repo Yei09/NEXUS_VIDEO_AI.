@@ -189,7 +189,7 @@ def main():
 
     scene_file = out / "scene.blend"
     build_seconds = 0.0
-    if not scene_file.exists():
+    if not scene_file.exists() or not (out / "scene_manifest.json").exists():
         scene_script = Path(__file__).resolve().parents[1] / "nexus_video3d" / "scene_factory.py"
         env = os.environ.copy()
         env.update({
@@ -318,10 +318,10 @@ def main():
         "samples": args.samples,
         "denoising": True,
         "restored_frames_from_previous_artifact": restored_frames,
-        "frames_rendered_in_this_run": rendered_total,
+        "frames_rendered_across_recorded_blocks": rendered_total,
         "verified_frames": 300,
         "render_seconds_recorded_in_blocks": round(render_seconds, 3),
-        "mean_seconds_per_rendered_frame_in_this_run": round(
+        "mean_seconds_per_rendered_frame_across_recorded_blocks": round(
             render_seconds / measured_frames, 3
         ) if measured_frames else None,
         "scene_build_seconds": round(build_seconds, 3),
