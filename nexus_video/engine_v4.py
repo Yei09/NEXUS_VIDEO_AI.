@@ -470,7 +470,9 @@ def write_reports(out, story, events, scene_metrics, first_frames, starts, lengt
                     "start_seconds": round(starts[i], 3), "duration_seconds": round(lengths[i], 3),
                     "text": e["text"]} for i, e in enumerate(events)],
         "voice": request["voice"], "voice_rate": request["voice_rate"],
-        "pitch_semitones": request["pitch_semitones"], "narration_intensity": request["intensity"],
+        "pitch_semitones": request["pitch_semitones"], "voice_volume": request["voice_volume"],
+        "pause_seconds": request["pause_seconds"], "duration_target_seconds": request["duration_target"],
+        "narration_intensity": request["intensity"],
         "duration_seconds": round(duration, 3), "width": W, "height": H, "fps": FPS,
         "video_codec": "h264", "audio_codec": "aac", "scene_count": len(events),
         "scene_diversity_verified": diversity_pass, "motion_verified": motion_pass,
@@ -502,6 +504,8 @@ def main():
         "voice": os.getenv("PIPER_VOICE", "es_MX-claude-high"),
         "voice_rate": float(os.getenv("VOICE_RATE", "1.0")),
         "pitch_semitones": float(os.getenv("PITCH_SEMITONES", "-1.0")),
+        "voice_volume": float(os.getenv("VOICE_VOLUME", "1.0")),
+        "pause_seconds": float(os.getenv("PAUSE_SECONDS", "0.78")),
         "intensity": os.getenv("NARRATION_INTENSITY", "mysterious"),
         "voice_auditions": os.getenv("VOICE_AUDITIONS", "false").lower() == "true"
     }
@@ -511,6 +515,10 @@ def main():
         raise ValueError("voice_rate debe estar entre 0.75 y 1.25.")
     if not -2.0 <= request["pitch_semitones"] <= 2.0:
         raise ValueError("pitch_semitones debe estar entre -2 y 2.")
+    if not 0.5 <= request["voice_volume"] <= 1.5:
+        raise ValueError("voice_volume debe estar entre 0.5 y 1.5.")
+    if not 0.2 <= request["pause_seconds"] <= 1.5:
+        raise ValueError("pause_seconds debe estar entre 0.2 y 1.5.")
     if request["intensity"] not in ("calm", "mysterious", "urgent"):
         raise ValueError("narration_intensity no válido.")
     voice = get_voice(request["voice"])
@@ -537,7 +545,7 @@ def main():
                        request["pitch_semitones"], request["intensity"])
             speech_parts.append(wav)
             lengths.append(media_duration(wav))
-            pauses.append(0.78 if request["intensity"] != "urgent" else 0.52)
+            pauses.append(request["pause_seconds"] if request["intensity"] != "urgent" else request["pause_seconds"]*0.67)
         with wave.open(str(speech_parts[0]), "rb") as f:
             sample_rate, channels, sample_width = f.getframerate(), f.getnchannels(), f.getsampwidth()
         audio_parts = []
@@ -589,7 +597,7 @@ def main():
         music, effects = narration_dir/"music.wav", narration_dir/"effects.wav"
         create_audio_beds(story["events"], starts, total, sample_rate, music, effects, request["intensity"])
         audio_mix = narration_dir/"audio_mix.wav"
-        mix_filter = "[0:a]highpass=f=70,lowpass=f=11500,acompressor=threshold=0.12:ratio=2.1:attack=18:release=180,volume=1.0[voice];[1:a]volume=0.34[music];[2:a]volume=0.55[fx];[voice][music][fx]amix=inputs=3:duration=first:weights='1 0.28 0.42',loudnorm=I=-16:TP=-1.5:LRA=10[mix]"
+        mix_filter = "[0:a]highpass=f=70,lowpass=f=11500,acompressor=threshold=0.12:ratio=2.1:attack=18:release=180,volume={request["voice_volume"]:.3f}[voice];[1:a]volume=0.34[music];[2:a]volume=0.55[fx];[voice][music][fx]amix=inputs=3:duration=first:weights='1 0.28 0.42',loudnorm=I=-16:TP=-1.5:LRA=10[mix]"
         run(["ffmpeg", "-y", "-i", str(narration), "-i", str(music), "-i", str(effects),
              "-filter_complex", mix_filter, "-map", "[mix]", "-c:a", "pcm_s16le", str(audio_mix)])
         video_dir = out/"videos"
