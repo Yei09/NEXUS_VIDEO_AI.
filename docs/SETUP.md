@@ -11,15 +11,16 @@
 1. Crea en Drive una carpeta llamada NEXUS VIDEO AI.
 2. En Google Cloud Console crea un proyecto sin vincular facturación.
 3. Habilita Google Drive API.
-4. Crea una cuenta de servicio y descarga su clave JSON.
-5. Comparte la carpeta con el correo client_email de esa cuenta de servicio como Editor.
+4. Configura la pantalla de consentimiento OAuth y crea un cliente OAuth de tipo Desktop.
+5. Para obtener el refresh token, configura el redirect URI https://developers.google.com/oauthplayground en el cliente OAuth y usa Google OAuth Playground con el scope https://www.googleapis.com/auth/drive. Autoriza tu cuenta y solicita un refresh token.
 6. Copia el ID de la carpeta desde su URL.
 7. En GitHub abre Settings → Secrets and variables → Actions:
-   - Secret GOOGLE_SERVICE_ACCOUNT_JSON: pega el JSON completo.
+   - Secret GOOGLE_OAUTH_CLIENT_JSON: pega el JSON del cliente OAuth.
+   - Secret GOOGLE_OAUTH_REFRESH_TOKEN: pega el refresh token.
    - Variable GOOGLE_DRIVE_FOLDER_ID: pega el ID de la carpeta.
-8. Nunca guardes la clave en el repositorio, issues, commits o conversaciones.
+8. Nunca guardes las credenciales en el repositorio, issues, commits o conversaciones.
 
-El cargador usa la API oficial con carga reanudable y verifica el MIME type y el tamaño del archivo después de subirlo. La cuenta de servicio debe tener acceso a la carpeta.
+El cargador usa OAuth de tu cuenta (adecuado para Mi unidad), carga de forma reanudable y verifica el MIME type y el tamaño después de subir el archivo. Las cuentas de servicio normalmente no tienen cuota de almacenamiento en Mi unidad; se reservan como alternativa para unidades compartidas compatibles.
 
 ## Piper TTS
 El workflow instala Piper TTS y descarga la voz española es_MX-ald-medium. Motor y modelo tienen licencias distintas; comprueba el MODEL_CARD de la voz antes de uso comercial. Se puede sustituir con PIPER_VOICE, PIPER_MODEL_URL y PIPER_CONFIG_URL en el workflow, tras verificar origen y licencia.
@@ -32,7 +33,7 @@ El workflow instala Piper TTS y descarga la voz española es_MX-ald-medium. Moto
 5. Revisa el paso Render narrated MP4 y el artefacto nexus-video-manual-test.
 6. Si Drive está configurado, revisa el paso Upload and verify Google Drive y el estado uploaded_and_verified en output/metadata.json.
 
-La validación comprueba vídeo H.264, audio AAC, resolución 1080×1920 y duración de 25–75 segundos.
+La validación comprueba vídeo H.264, audio AAC, resolución 1080×1920 y duración de 30–60 segundos. La música ambiental de prueba se sintetiza en el propio runner con tonos originales, sin descargar pistas protegidas.
 
 ## Make.com (opcional)
 Crea un escenario con Webhooks → Custom webhook. Guarda su URL como secreto MAKE_WEBHOOK_URL en GitHub Actions. El sistema enviará estado y metadatos al finalizar. No programes escenarios ni automatices disparadores todavía. La integración futura para iniciar workflows desde Make requiere un token de GitHub con permisos mínimos y quedará apagada hasta que se apruebe.
