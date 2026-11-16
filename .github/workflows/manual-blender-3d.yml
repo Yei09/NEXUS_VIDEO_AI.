@@ -11,7 +11,7 @@ on:
         default: "8"
 jobs:
   render:
-    if: ${{ github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && github.event.action == 'synchronize' && github.event.pull_request.head.ref == 'cinematic-reconstruction' && github.event.pull_request.base.ref == 'main') }}
+    if: ${{ github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && github.event.action == 'synchronize' && github.event.pull_request.number == 3 && github.event.pull_request.head.ref == 'cinematic-reconstruction' && github.event.pull_request.base.ref == 'main') }}
     runs-on: ubuntu-latest
     timeout-minutes: 90
     permissions:
@@ -32,6 +32,7 @@ jobs:
           set -euo pipefail
           if [[ "$EVENT_NAME" == "pull_request" ]]; then
             [[ "$EVENT_ACTION" == "synchronize" ]]
+            [[ "$PR_NUMBER" == "3" ]]
             [[ "$PR_HEAD_REF" == "cinematic-reconstruction" ]]
             [[ "$PR_BASE_REF" == "main" ]]
             [[ "$PR_HEAD_REPO" == "$GITHUB_REPOSITORY" ]]
