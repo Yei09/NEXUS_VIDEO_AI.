@@ -9,7 +9,7 @@ Generador cloud de **historias originales de terror en español** para vídeos v
 3. Piper TTS genera la narración en español.
 4. Python/Pillow crea escenas ilustradas originales localmente (sin bancos de imágenes ni API de pago).
 5. FFmpeg monta las escenas, subtítulos sincronizados, voz y ambiente de terror sintetizado.
-6. Valida MP4 H.264/AAC, 1080×1920 y duración de 25–60 segundos.
+6. Valida MP4 H.264/AAC, 1080×1920 y duración de 30–60 segundos.
 7. Puede guardar el MP4 en Google Drive cuando se configuren credenciales OAuth.
 
 ## Seguridad y límites
