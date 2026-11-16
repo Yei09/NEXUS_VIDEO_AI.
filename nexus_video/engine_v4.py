@@ -179,6 +179,16 @@ def allocate_pause_durations(speech_lengths, target_seconds, requested_pause, in
     pauses[-1] += available - sum(pauses)
     return pauses
 
+
+def build_scene_durations(speech_lengths, pauses):
+    """Map every narration pause to its preceding scene, preserving the full timeline."""
+    if len(pauses) != max(0, len(speech_lengths) - 1):
+        raise ValueError("Debe existir exactamente una pausa entre cada par de segmentos.")
+    return [
+        float(length) + (float(pauses[i]) if i < len(pauses) else 0.0)
+        for i, length in enumerate(speech_lengths)
+    ]
+
 def create_audio_beds(events, starts, total_seconds, sample_rate, music_path, effects_path, intensity):
     count = int(math.ceil(total_seconds * sample_rate))
     rng = random.Random("nexus-v4-audio")
@@ -643,6 +653,7 @@ def write_reports(out, story, events, scene_metrics, first_frames, starts, lengt
         "audio_mix_duration_seconds": round(media_duration(audio_mix), 3),
         "audio_video_duration_delta_seconds": round(abs(duration-media_duration(audio_mix)), 3),
         "requested_duration_seconds": request["duration_target"],
+        "scene_timeline_duration_seconds": round(scene_timeline_total, 3),
         "duration_error_seconds": round(abs(duration-request["duration_target"]), 3),
         "narration_file": narration.name, "audio_mix_file": audio_mix.name,
         "ffprobe_format": probe.get("format", {}).get("format_name"),
@@ -768,8 +779,15 @@ def main():
         lengths_for_captions = [lengths[i] for i in range(len(lengths))]
         notify_progress("scenes_rendering")
         clips, first_frames, scene_metrics = [], [], []
+        scene_durations = build_scene_durations(lengths, pauses)
+        scene_timeline_total = sum(scene_durations)
+        if abs(scene_timeline_total - total) > 0.15:
+            raise RuntimeError(
+                f"La línea temporal visual suma {scene_timeline_total:.3f}s, "
+                f"pero la narración suma {total:.3f}s."
+            )
         for i, event in enumerate(story["events"]):
-            clip, first, metric = render_scene(event, lengths[i]+(pauses[i] if i < len(pauses)-1 else 0), work, i)
+            clip, first, metric = render_scene(event, scene_durations[i], work, i)
             clips.append(clip)
             first_frames.append(first)
             scene_metrics.append(metric)
