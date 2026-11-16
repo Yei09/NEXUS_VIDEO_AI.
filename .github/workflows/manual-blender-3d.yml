@@ -101,10 +101,25 @@ jobs:
           if old not in source:
               raise SystemExit("Expected Euler helper source not found; refusing an unverified patch")
           patched = source.replace(old, new, 1)
+          old_curves = ''' # Explicit linear interpolation for smooth deterministic movement.
+           for obj in s.objects:
+            if obj.animation_data and obj.animation_data.action:
+             for fc in obj.animation_data.action.fcurves:
+              for kp in fc.keyframe_points: kp.interpolation="BEZIER"
+          '''
+          new_curves = ''' # Blender 5 uses layered Actions; retain default BEZIER interpolation when legacy fcurves are unavailable.
+           for obj in s.objects:
+            if obj.animation_data and obj.animation_data.action and hasattr(obj.animation_data.action, "fcurves"):
+             for fc in obj.animation_data.action.fcurves:
+              for kp in fc.keyframe_points: kp.interpolation="BEZIER"
+          '''
+          if old_curves not in patched:
+              raise SystemExit("Expected legacy Action.fcurves block not found; refusing an unverified compatibility patch")
+          patched = patched.replace(old_curves, new_curves, 1)
           path.write_text(patched, encoding="utf-8")
           report = {
-              "patch": "runner_local_euler_component_assignment",
-              "reason": "The door hinge keyframes pass a 3-component Euler tuple with array_index=2; select the Z component before key insertion.",
+              "patch": "runner_local_euler_and_blender5_action_compatibility",
+              "reason": "Select the Z component for hinge Euler keyframes and guard legacy Action.fcurves access on Blender 5 layered Actions.",
               "source_sha256": hashlib.sha256(source.encode()).hexdigest(),
               "runtime_sha256": hashlib.sha256(patched.encode()).hexdigest(),
               "repository_files_modified": False
