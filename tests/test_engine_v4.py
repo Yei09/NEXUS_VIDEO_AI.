@@ -88,6 +88,21 @@ class EngineV4VisualTests(unittest.TestCase):
         speech = [5.0] * 6
         pauses = allocate_pause_durations(speech, 45.0, 0.78, "urgent")
         self.assertAlmostEqual(sum(speech) + sum(pauses), 45.0, places=9)
+ 
+    def test_scene_timeline_includes_all_five_pauses(self):
+        from nexus_video.engine_v4 import build_scene_durations
+        speech = [6.0] * 6
+        pauses = [0.5, 0.6, 0.7, 0.8, 2.4]
+        durations = build_scene_durations(speech, pauses)
+        self.assertEqual(len(durations), 6)
+        self.assertAlmostEqual(sum(durations), sum(speech) + sum(pauses), places=9)
+        self.assertAlmostEqual(durations[4], 8.4, places=9)
+        self.assertAlmostEqual(durations[5], 6.0, places=9)
+
+    def test_scene_timeline_rejects_missing_pause(self):
+        from nexus_video.engine_v4 import build_scene_durations
+        with self.assertRaises(ValueError):
+            build_scene_durations([6.0] * 6, [0.5, 0.6, 0.7, 0.8])
 
 if __name__ == "__main__":
     unittest.main()
