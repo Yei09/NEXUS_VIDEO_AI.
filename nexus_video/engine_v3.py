@@ -2,7 +2,7 @@ from __future__ import annotations
 import json, math, os, random, shutil, subprocess, sys, urllib.request, wave
 from datetime import datetime, timezone
 from pathlib import Path
-from PIL import Image, ImageDraw, ImageFilter
+from PIL import Image, ImageDraw, ImageFilter, ImageChops, ImageStat
 
 ROOT=Path(__file__).resolve().parents[1]
 OUT=ROOT/"output"; WORK=ROOT/"work"
@@ -60,7 +60,9 @@ def wrap(draw,text,font,max_width):
    current=word
  if current: lines.append(current)
  return lines
+_SCENE_CACHE={}
 def base_scene(kind,frame):
+ if kind in _SCENE_CACHE: return _SCENE_CACHE[kind].copy()
  # Every scene has a different layout, focal subject and camera-space composition.
  im=Image.new("RGB",(BASE_W,BASE_H),(5,7,13)); p=im.load()
  for y in range(BASE_H):
@@ -119,8 +121,9 @@ def base_scene(kind,frame):
   d.text((205,505),"SÓTANO",fill=(240,220,205,255))
  # Foreground framing and subtle grime are part of the scene, not a reused backdrop.
  d.rectangle((0,0,BASE_W,BASE_H),outline=(30,32,40,180),width=8)
+ _SCENE_CACHE[kind]=im.copy()
  return im
-def draw_frame(kind,motion,index,total,seed):
+def draw_frame(kind,motion,index,total,seed,transition):
  im=base_scene(kind,index); d=ImageDraw.Draw(im,"RGBA")
  t=index/max(1,total-1)
  # Animated subject motion is different for each event.
@@ -150,6 +153,17 @@ def draw_frame(kind,motion,index,total,seed):
   x=(j*71+index*(1+j%3)*2)%BASE_W; y=(j*131+index*3)%BASE_H
   fd.ellipse((x,y,x+2,y+2),fill=(210,215,225,90))
  im=Image.alpha_composite(im.convert("RGBA"),fog.filter(ImageFilter.GaussianBlur(12)))
+ # Event-specific transitions: fade, flash, impact shake and whip streaks.
+ if transition=="flash" and index<5:
+  alpha=int(220*(1-index/5)); flash=Image.new("RGBA",(BASE_W,BASE_H),(245,240,225,alpha)); im=Image.alpha_composite(im,flash)
+ elif transition=="fade":
+  edge=min(index, total-1-index); alpha=int(190*max(0,1-edge/6)) if edge<6 else 0
+  im=Image.alpha_composite(im,Image.new("RGBA",(BASE_W,BASE_H),(0,0,0,alpha)))
+ elif transition=="whip" and index>=total-6:
+  streak=Image.new("RGBA",(BASE_W,BASE_H),(0,0,0,0)); sd=ImageDraw.Draw(streak)
+  for j in range(18):
+   y=j*54; sd.line((0,y,BASE_W,y-100),fill=(190,200,215,35),width=8)
+  im=Image.alpha_composite(im,streak)
  # Intermittent practical-light flicker, stronger during impact beats.
  flicker=0.90+0.10*math.sin(index*0.22)+(0.12 if index%37<2 else 0)
  overlay=Image.new("RGBA",(BASE_W,BASE_H),(0,0,0,int(max(0,1-flicker)*110)))
@@ -227,7 +241,7 @@ def main():
   secs=lengths[i]+pauses[i]
   count=max(30,int(math.ceil(secs*12)))
   for n in range(count):
-   frame=draw_frame(event["scene"],event["motion"],n,count,seed+i*997)
+   frame=draw_frame(event["scene"],event["motion"],n,count,seed+i*997,event["transition"])
    frame.save(frames/f"frame-{n:04d}.jpg",quality=88)
   run(["ffmpeg","-y","-framerate","12","-i",str(frames/"frame-%04d.jpg"),"-vf","scale=1080:1920:flags=lanczos,fps=30,format=yuv420p","-an","-c:v","libx264","-preset","veryfast","-crf","20",str(clip)])
   clips.append(clip); lengths_clip.append(duration(clip))
@@ -269,7 +283,23 @@ def main():
  secs=float(probe["format"]["duration"])
  if (v.get("codec_name")!="h264" or v.get("width")!=1080 or v.get("height")!=1920 or a.get("codec_name")!="aac" or v.get("r_frame_rate")!="30/1" or not 30<=secs<=60):
   raise RuntimeError("Validación técnica de salida fallida.")
- meta={"status":"rendered","version":"cinematic-v3","created_at":datetime.now(timezone.utc).isoformat(),"title":story["title"],"genre":story["genre"],"events":story["events"],"voice":voice_id,"voice_auditions":[v["id"] for v in VOICES],"narration_file":"narration.wav","video_file":mp4.name,"duration_seconds":round(secs,2),"width":1080,"height":1920,"fps":30,"video_codec":"h264","audio_codec":"aac","scene_count":len(clips),"scene_types":[e["scene"] for e in story["events"]],"animation":"12 fps generated scene frames with moving props, silhouettes, fog, particles, flicker and impact shake; encoded at 30 fps","sound_design":"event-timed synthesized cues, low drone and wind; narration mixed separately","social_publishing":False,"make_connected":False,"google_drive_connected":False}
+ # Acceptance evidence: verify visible frame-to-frame motion and distinct scene compositions.
+ motion=[]; first_frames=[]
+ for i,event in enumerate(story["events"]):
+  files=sorted((WORK/f"frames-{i}").glob("frame-*.jpg"))
+  first=Image.open(files[0]).convert("RGB"); mid=Image.open(files[len(files)//2]).convert("RGB")
+  delta=sum(ImageStat.Stat(ImageChops.difference(first,mid)).mean)/3
+  motion.append({"scene":event["scene"],"mean_frame_difference":round(delta,3),"frames_checked":len(files)})
+  first_frames.append(first)
+ if any(x["mean_frame_difference"]<1.0 for x in motion): raise RuntimeError("Una escena no superó la prueba de movimiento perceptible.")
+ distinct=[]
+ for i in range(len(first_frames)):
+  for j in range(i+1,len(first_frames)):
+   delta=sum(ImageStat.Stat(ImageChops.difference(first_frames[i],first_frames[j])).mean)/3
+   distinct.append(round(delta,3))
+ if any(x<8.0 for x in distinct): raise RuntimeError("Dos escenas son demasiado similares; se detiene la entrega.")
+ (OUT/"motion_report.json").write_text(json.dumps({"motion":motion,"pairwise_scene_difference":distinct,"motion_pass":True,"scene_diversity_pass":True},indent=2),encoding="utf-8")
+ meta={"status":"rendered","version":"cinematic-v3","created_at":datetime.now(timezone.utc).isoformat(),"title":story["title"],"genre":story["genre"],"events":story["events"],"voice":voice_id,"voice_auditions":[v["id"] for v in VOICES],"narration_file":"narration.wav","video_file":mp4.name,"duration_seconds":round(secs,2),"width":1080,"height":1920,"fps":30,"video_codec":"h264","audio_codec":"aac","scene_count":len(clips),"motion_report":"motion_report.json","motion_verified":True,"scene_diversity_verified":True,"scene_types":[e["scene"] for e in story["events"]],"animation":"12 fps generated scene frames with moving props, silhouettes, fog, particles, flicker and impact shake; encoded at 30 fps","sound_design":"event-timed synthesized cues, low drone and wind; narration mixed separately","social_publishing":False,"make_connected":False,"google_drive_connected":False}
  (OUT/"metadata.json").write_text(json.dumps(meta,ensure_ascii=False,indent=2),encoding="utf-8")
  (OUT/"script.txt").write_text("\n".join(e["text"] for e in story["events"]),encoding="utf-8")
  print(json.dumps(meta,ensure_ascii=False,indent=2))
