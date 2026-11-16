@@ -6,6 +6,7 @@ from pathlib import Path
 
 from PIL import Image, ImageDraw, ImageFilter, ImageChops, ImageStat, ImageFont
 from .story_v4 import generate_story
+from .cinematic_v42 import cinematic_finish, cinematic_camera
 
 ROOT = Path(__file__).resolve().parents[1]
 OUT_ROOT = ROOT / "output"
@@ -522,6 +523,7 @@ def render_frame(event, t, frame_no, total_frames, seed):
         y = (k*137 + frame_no*2) % BASE_H
         fd.ellipse((x, y, x+2, y+2), fill=(220, 225, 230, 100))
     im = Image.alpha_composite(im, fog.filter(ImageFilter.GaussianBlur(11)))
+    im = cinematic_finish(im, event, t, frame_no, total_frames, seed)
     # Scene transition is event-defined and visibly different from a simple camera zoom.
     if event["transition"] in ("flash", "impact") and frame_no < 5:
         alpha = int(180 * (1-frame_no/5))
@@ -543,14 +545,8 @@ def render_frame(event, t, frame_no, total_frames, seed):
         shifted = Image.new("RGBA", (BASE_W, BASE_H), (0, 0, 0, 255))
         shifted.alpha_composite(im, (dx, dy))
         im = shifted
-    # Slow camera push-in and pan; subject animation remains visible within the shot.
-    zoom = 1.015 + 0.035*t
-    sw, sh = int(BASE_W*zoom), int(BASE_H*zoom)
-    enlarged = im.resize((sw, sh), Image.Resampling.LANCZOS)
-    max_x, max_y = sw-BASE_W, sh-BASE_H
-    left = max(0, min(max_x, int(max_x*(0.5+0.35*math.sin(phase*0.22)))))
-    top = max(0, min(max_y, int(max_y*(0.5+0.30*math.cos(phase*0.18)))))
-    return enlarged.crop((left, top, left+BASE_W, top+BASE_H)).convert("RGB")
+    # Narrative camera paths are event-specific; no generic zoom-only movement.
+    return cinematic_camera(im, event, t, frame_no, total_frames, seed)
 
 def image_difference(a, b):
     diff = ImageChops.difference(a.convert("RGB"), b.convert("RGB"))
@@ -589,6 +585,32 @@ def render_scene(event, seconds, work, index, variant_offset=0):
         "scene_label": SCENE_NAMES.get(event["scene"], event["scene"]), "mean_frame_difference": round(score, 3),
         "diversity_sample": "midpoint", "frames_checked": frame_count,
         "retry_count": retries, "diversity_regeneration_count": 0}
+
+def extract_representative_frames(mp4, out, events, starts, scene_durations):
+    """Extract six representative JPEGs from the final encoded MP4, not source stills."""
+    frame_dir = out / "frames"
+    frame_dir.mkdir(parents=True, exist_ok=True)
+    samples = []
+    for i, event in enumerate(events):
+        timestamp = starts[i] + scene_durations[i] * 0.55
+        target = frame_dir / f"scene-{i+1:02d}-{event['scene']}.jpg"
+        run(["ffmpeg", "-y", "-ss", f"{timestamp:.3f}", "-i", str(mp4),
+             "-frames:v", "1", "-q:v", "2", str(target)])
+        if not target.exists() or target.stat().st_size < 1000:
+            raise RuntimeError(f"No se pudo extraer el fotograma representativo: {target.name}")
+        samples.append((event["scene"], target))
+    thumb_w, thumb_h = 270, 480
+    sheet = Image.new("RGB", (thumb_w*3, thumb_h*2), (5, 7, 12))
+    draw = ImageDraw.Draw(sheet)
+    for i, (scene, path) in enumerate(samples):
+        frame = Image.open(path).convert("RGB").resize((thumb_w, thumb_h), Image.Resampling.LANCZOS)
+        x, y = (i % 3)*thumb_w, (i // 3)*thumb_h
+        sheet.paste(frame, (x, y))
+        draw.rectangle((x+5, y+5, x+thumb_w-5, y+35), fill=(0, 0, 0))
+        draw.text((x+12, y+12), scene, font=load_font(14), fill=(245, 245, 245))
+    sheet.save(frame_dir / "contact_sheet.jpg", quality=92)
+    return [str(path.relative_to(out)) for _, path in samples], str((frame_dir / "contact_sheet.jpg").relative_to(out))
+
 
 def write_subtitles(events, starts, lengths, path):
     def ts(v):
@@ -631,6 +653,8 @@ def write_reports(out, story, events, scene_metrics, first_frames, starts, lengt
         "motion_pass": motion_pass, "scene_diversity_pass": diversity_pass,
         "scene_metrics": scene_metrics, "pairwise_scene_comparison": pairwise,
         "scene_count": len(events), "regeneration_limit_per_scene": 2,
+        "cinematic_profile": "layered_key_rim_light_volumetric_haze_depth_particles_v42",
+        "camera_profile": "event_driven_dolly_pan_track_handheld_push_pull_reveal_v42",
         "note": "Las métricas comparan fotogramas renderizados; la aprobación estética final requiere revisión humana."
     }
     (out/"motion_report.json").write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
@@ -656,12 +680,13 @@ def write_reports(out, story, events, scene_metrics, first_frames, starts, lengt
         "duration_error_seconds": round(abs(duration-request["duration_target"]), 3),
         "narration_file": narration.name, "audio_mix_file": audio_mix.name,
         "ffprobe_format": probe.get("format", {}).get("format_name"),
+        "cinematic_engine": "NEXUS V4.2 layered 2D cinematic compositor",
     }
     (out/"render_report.json").write_text(json.dumps(render_report, ensure_ascii=False, indent=2), encoding="utf-8")
     if not render_report["valid"]:
         raise RuntimeError("El MP4 no superó todos los criterios técnicos y visuales; revisa render_report.json y motion_report.json.")
     metadata = {
-        "schema_version": "1.0", "project": "NEXUS VIDEO AI", "version": "V4",
+        "schema_version": "1.0", "project": "NEXUS VIDEO AI", "version": "V4.2-cinematic",
         "request_id": request["request_id"], "status": "rendered",
         "created_at": datetime.now(timezone.utc).isoformat(),
         "category": story["category"], "genre": story["genre"], "title": story["title"],
@@ -800,7 +825,7 @@ def main():
                 break
             weak_index = weak_pairs[0][1]
             clips[weak_index], first_frames[weak_index], scene_metrics[weak_index] = render_scene(
-                story["events"][weak_index], lengths[weak_index]+(pauses[weak_index] if weak_index < len(pauses)-1 else 0),
+                story["events"][weak_index], scene_durations[weak_index],
                 work, weak_index, variant_offset=diversity_attempt)
             scene_metrics[weak_index]["diversity_regeneration_count"] = diversity_attempt
         pair_diffs = [image_difference(first_frames[i], first_frames[j])
@@ -840,6 +865,8 @@ def main():
              "-pix_fmt", "yuv420p", "-r", "30", "-c:a", "aac", "-b:a", "192k", "-ar", "44100",
              "-movflags", "+faststart", "-shortest", str(mp4)])
         first_frames[0].save(out/"thumbnail.jpg", quality=92)
+        representative_frames, frame_contact_sheet = extract_representative_frames(
+            mp4, out, story["events"], starts, scene_durations)
         report_dir = out/"reports"
         report_dir.mkdir(exist_ok=True)
         # Write the formal reports under the requested folder and retain a root metadata file.
@@ -852,6 +879,8 @@ def main():
         metadata["files"]["video"] = str(mp4.relative_to(out))
         metadata["files"]["narration"] = str(narration.relative_to(out))
         metadata["files"]["audio_mix"] = str(audio_mix.relative_to(out))
+        metadata["files"]["representative_frames"] = representative_frames
+        metadata["files"]["frame_contact_sheet"] = frame_contact_sheet
         (out/"metadata.json").write_text(json.dumps(metadata, ensure_ascii=False, indent=2), encoding="utf-8")
         notify_progress("rendered")
         print(json.dumps(metadata, ensure_ascii=False, indent=2))
