@@ -159,8 +159,10 @@ jobs:
           GITHUB_REPOSITORY: ${{ github.repository }}
         run: |
           python -m py_compile nexus_video/story_v4.py nexus_video/engine_v4.py nexus_video/cinematic_v42.py nexus_video/cinematic_depth_v421.py tests/test_story_v4.py tests/test_engine_v4.py tests/test_cinematic_v42.py tests/test_cinematic_depth_v421.py tools/compare_v42_v421.py
-          python -m unittest discover -s tests -v
+          python -m unittest discover -s tests -v 2>&1 | tee test-results.log
           python -m nexus_video.engine_v4
+          mkdir -p output/$REQUEST_ID/reports
+          cp test-results.log output/$REQUEST_ID/reports/test-results.log
       - name: Download protected V4.2 baseline artifact
         if: ${{ github.event_name == 'workflow_dispatch' && steps.render.outcome == 'success' }}
         uses: actions/download-artifact@v4
@@ -223,8 +225,18 @@ jobs:
           layers=motion.get("independent_layer_manifest", [])
           assert len(layers) == 6, "Missing independent layer manifest for six scenes"
           assert all(len(scene_layers) >= 1 for scene_layers in layers), "A scene has no independent layers"
+          metrics=motion.get("scene_metrics", [])
+          assert len(metrics) == 6, "Expected six scene motion records"
+          assert all(len(m.get("independent_layer_motion_samples", [])) == 3 for m in metrics), "Missing start/mid/end independent layer traces"
           print(f"DELIVERABLES_OK mp4={sys.argv[1]} duration={duration:.3f}s target={target:.3f}s")
           PY
+      - name: Preserve test evidence if rendering stops early
+        if: ${{ always() && hashFiles('test-results.log') != '' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: nexus-v4.2.1-test-evidence-${{ github.run_id }}
+          path: test-results.log
+          retention-days: 14
       - name: Preserve V4.2.1 output as GitHub artifact
         if: ${{ always() }}
         uses: actions/upload-artifact@v4
