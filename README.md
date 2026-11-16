@@ -36,6 +36,8 @@ Inputs:
 - voice: es_MX-claude-high / es_MX-ald-medium / es_ES-davefx-medium / es_ES-sharvard-medium
 - voice_rate: 0.75–1.25
 - pitch_semitones: -2 a +2
+- voice_volume: 0.5–1.5
+- pause_seconds: 0.2–1.5
 - narration_intensity: calm / mysterious / urgent
 - voice_auditions: true para cuatro muestras WAV
 
