@@ -52,7 +52,7 @@ def build():
  def actor_part(n,loc,dim,ma,bn,sphere=False):
   if sphere: bpy.ops.mesh.primitive_uv_sphere_add(segments=16,ring_count=8,radius=1,location=loc)
   else: bpy.ops.mesh.primitive_cube_add(size=1,location=loc)
-  o=bpy.context.object; o.name=n; o.dimensions=dim; bpy.ops.object.transform_apply(location=False,rotation=False,scale=True); o.data.materials.append(ma); o.parent=rig; o.parent_type="BONE"; o.parent_bone=bn; return o
+  o=bpy.context.object; o.name=n; o.dimensions=dim; bpy.ops.object.transform_apply(location=False,rotation=False,scale=True); o.data.materials.append(ma); world=o.matrix_world.copy(); o.parent=rig; o.parent_type="BONE"; o.parent_bone=bn; o.matrix_parent_inverse=(rig.matrix_world @ arm.bones[bn].matrix_local).inverted(); o.matrix_world=world; return o
  actor_part("torso",(0,0,1.15),(.62,.34,.76),cloth,"spine"); actor_part("head_mesh",(0,0,1.72),(.34,.32,.38),skin,"head",True)
  for side,sgn in (("L",-1),("R",1)):
   actor_part("upper_arm_"+side,(sgn*.2,0,1.25),(.2,.22,.46),cloth,"upper_arm_"+side); actor_part("forearm_"+side,(sgn*.4,0,1),(.17,.19,.36),cloth,"forearm_"+side)
