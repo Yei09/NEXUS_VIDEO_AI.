@@ -51,7 +51,10 @@ Módulos en este orden:
    - pause_seconds está entre 0.2 y 1.5
    - narration_intensity es calm, mysterious o urgent
    - si operation=upload_only, request_id y source_run_id son obligatorios.
-3. Data Store > Add/Replace a Record. Usa Key=request_id y desactiva Overwrite an existing record. Si la clave ya existe, Make produce un error; añade una ruta de error que responda 409 duplicate_request y no despache otra generación. Activa Process data in order en la configuración del escenario para serializar las solicitudes y reducir carreras entre comprobación y escritura.
+3. Usa un Router según operation:
+   - Ruta render: Data Store > Add/Replace a Record con Key=request_id y Overwrite desactivado. Si la clave ya existe, la operación falla; la ruta de error responde HTTP 409 duplicate_request y no despacha un nuevo render.
+   - Ruta upload_only: Data Store > Get a Record con Key=request_id. Solo continúa si el registro existe, status=error, stage=drive_upload_failed y run_id coincide exactamente con source_run_id. Después usa Data Store > Update a Record para status=pending, stage=drive_retry. Si no coincide, responde HTTP 409 retry_not_allowed.
+   Activa Process data in order en la configuración del escenario para serializar las solicitudes y reducir carreras entre comprobación y escritura.
 4. HTTP > Make a request (HTTP v4):
    - Method: POST
    - URL: https://api.github.com/repos/Yei09/NEXUS_VIDEO_AI./actions/workflows/nexus-video-v4.yml/dispatches
@@ -127,7 +130,7 @@ El panel debe llamar a estos webhooks desde un backend/proxy propio; no expongas
 
 - Activa Process data in order en el escenario de solicitudes.
 - La clave del Data Store es request_id; no permitas sobrescritura al crear.
-- No reintentes un render con el mismo request_id. Si falla Drive, envía operation=upload_only con el mismo request_id y source_run_id original.
+- No reintentes un render con el mismo request_id. Si falla Drive, la ruta upload_only solo se permite cuando el registro está en error/drive_upload_failed; conserva el mismo request_id y source_run_id original.
 - Para fallos HTTP 429/5xx del endpoint de GitHub, usa un error handler con máximo 3 intentos y espera progresiva (por ejemplo 2, 5 y 10 segundos). No reintentes 401/403/422: son errores de credenciales o payload.
 - Si GitHub devuelve 204 pero no llega callback, conserva el estado processing y consulta el run en GitHub manualmente; no lances otro render a ciegas.
 - Make Free tiene límites propios de operaciones, webhooks y Data Store; mantén la primera prueba manual y no habilites un horario.
