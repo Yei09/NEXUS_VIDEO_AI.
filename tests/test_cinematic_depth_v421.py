@@ -69,7 +69,9 @@ class CinematicDepthV421Tests(unittest.TestCase):
                         self.base, {"scene": scene, "action": action, "sfx": sfx},
                         .5, 45, 90, 7019
                     )
-                    self.assertTrue(layers, f"{category}/{action} has no independent layer")
+                    self.assertIn("background_plate_legacy", [x["name"] for x in layers])
+                    self.assertTrue(any(x["name"] != "background_plate_legacy" for x in layers),
+                                    f"{category}/{action} has no independent action layer")
 
 
 if __name__ == "__main__":
