@@ -628,6 +628,7 @@ def main():
         # Write the formal reports under the requested folder and retain a root metadata file.
         metadata = write_reports(report_dir, story, story["events"], scene_metrics, first_frames,
                                  starts, lengths, mp4, narration, audio_mix, request)
+        (report_dir/"metadata.json").unlink(missing_ok=True)
         # Normalize report paths for Drive and artifact consumers.
         (out/"motion_report.json").write_text((report_dir/"motion_report.json").read_text(encoding="utf-8"), encoding="utf-8")
         (out/"render_report.json").write_text((report_dir/"render_report.json").read_text(encoding="utf-8"), encoding="utf-8")
