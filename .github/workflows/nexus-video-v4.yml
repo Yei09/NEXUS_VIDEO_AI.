@@ -1,0 +1,290 @@
+name: NEXUS VIDEO AI V4 Production
+on:
+  workflow_dispatch:
+    inputs:
+      operation:
+        description: render creates a new video; upload_only retries Drive from an existing artifact
+        type: choice
+        required: true
+        default: render
+        options:
+          - render
+          - upload_only
+      request_id:
+        description: UUID unique per request; leave empty only for a manual run
+        type: string
+        required: false
+        default: ""
+      category:
+        description: Story category
+        type: choice
+        required: true
+        default: paranormal
+        options:
+          - paranormal
+          - casa_embrujada
+          - leyenda_urbana
+          - criaturas
+          - psicologico
+      duration_seconds:
+        description: Target duration; output is validated within 30-60 seconds
+        type: number
+        required: true
+        default: 45
+      voice:
+        description: Piper voice model
+        type: choice
+        required: true
+        default: es_MX-claude-high
+        options:
+          - es_MX-claude-high
+          - es_MX-ald-medium
+          - es_ES-davefx-medium
+          - es_ES-sharvard-medium
+      voice_rate:
+        description: Narration rate multiplier (0.75-1.25)
+        type: string
+        required: true
+        default: "1.0"
+      pitch_semitones:
+        description: Pitch adjustment in semitones (-2 to 2)
+        type: string
+        required: true
+        default: "-1.0"
+      voice_volume:
+        description: Narration output volume (0.5-1.5)
+        type: string
+        required: true
+        default: "1.0"
+      pause_seconds:
+        description: Pause between story beats in seconds (0.2-1.5)
+        type: string
+        required: true
+        default: "0.78"
+      narration_intensity:
+        description: Narration and sound-design intensity
+        type: choice
+        required: true
+        default: mysterious
+        options:
+          - calm
+          - mysterious
+          - urgent
+      voice_auditions:
+        description: Generate four separate Piper voice audition WAVs
+        type: boolean
+        required: true
+        default: false
+      source_run_id:
+        description: Required only for upload_only; source GitHub Actions run ID
+        type: string
+        required: false
+        default: ""
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: nexus-v4-${{ inputs.request_id || github.run_id }}
+  cancel-in-progress: false
+jobs:
+  production:
+    if: ${{ github.event_name == 'workflow_dispatch' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    env:
+      REQUEST_ID: ${{ inputs.request_id }}
+      OPERATION: ${{ inputs.operation }}
+      SOURCE_RUN_ID: ${{ inputs.source_run_id }}
+      CATEGORY: ${{ inputs.category }}
+      DURATION_SECONDS: ${{ inputs.duration_seconds }}
+      PIPER_VOICE: ${{ inputs.voice }}
+      VOICE_RATE: ${{ inputs.voice_rate }}
+      PITCH_SEMITONES: ${{ inputs.pitch_semitones }}
+      VOICE_VOLUME: ${{ inputs.voice_volume }}
+      PAUSE_SECONDS: ${{ inputs.pause_seconds }}
+      NARRATION_INTENSITY: ${{ inputs.narration_intensity }}
+      VOICE_AUDITIONS: ${{ inputs.voice_auditions }}
+      DRIVE_CONFIGURED: ${{ secrets.GOOGLE_OAUTH_CLIENT_JSON != '' && secrets.GOOGLE_OAUTH_REFRESH_TOKEN != '' }}
+    steps:
+      - name: Validate dispatch branch and print GitHub context
+        shell: bash
+        env:
+          EXPECTED_REF: refs/heads/v4-make-drive
+        run: |
+          echo "github.event_name=$GITHUB_EVENT_NAME"
+          echo "github.ref=$GITHUB_REF"
+          echo "github.ref_name=$GITHUB_REF_NAME"
+          if [[ "$GITHUB_EVENT_NAME" != "workflow_dispatch" ]]; then
+            echo "::error::This workflow only accepts manual workflow_dispatch runs."
+            exit 1
+          fi
+          if [[ "$GITHUB_REF" != "$EXPECTED_REF" ]]; then
+            echo "::error title=Wrong branch::Select v4-make-drive in the Run workflow branch selector. No production code was checked out."
+            exit 1
+          fi
+      - name: Checkout V4 branch
+        uses: actions/checkout@v4
+        with:
+          ref: v4-make-drive
+      - name: Install FFmpeg and fonts
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg fonts-dejavu-core
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+      - name: Prepare request identity
+        id: request
+        run: |
+          python - <<'PY'
+          import os, uuid
+          value=os.getenv("REQUEST_ID","").strip() or str(uuid.uuid4())
+          parsed=str(uuid.UUID(value))
+          if parsed != value.lower():
+              raise SystemExit("request_id must be a canonical UUID")
+          with open(os.environ["GITHUB_ENV"],"a") as f:
+              f.write("REQUEST_ID="+parsed+"\n")
+              f.write("ARTIFACT_NAME=nexus-v4-"+parsed+"\n")
+          with open(os.environ["GITHUB_OUTPUT"],"a") as f:
+              f.write("request_id="+parsed+"\n")
+          print("request_id="+parsed)
+          PY
+      - name: Validate upload-only inputs
+        if: ${{ inputs.operation == 'upload_only' }}
+        run: |
+          test -n "${{ inputs.request_id }}" || (echo "request_id is required for upload_only" && exit 1)
+          test -n "${{ inputs.source_run_id }}" || (echo "source_run_id is required for upload_only" && exit 1)
+      - name: Notify Make that processing started
+        if: ${{ inputs.operation == 'render' }}
+        continue-on-error: true
+        env:
+          NEXUS_STATUS: processing
+          REQUEST_ID: ${{ steps.request.outputs.request_id }}
+          ARTIFACT_NAME: nexus-v4-${{ steps.request.outputs.request_id }}
+          MAKE_RESULT_WEBHOOK_URL: ${{ secrets.MAKE_RESULT_WEBHOOK_URL }}
+          MAKE_WEBHOOK_API_KEY: ${{ secrets.MAKE_WEBHOOK_API_KEY }}
+          GITHUB_RUN_ID: ${{ github.run_id }}
+          GITHUB_SERVER_URL: ${{ github.server_url }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+        run: python -m nexus_video.notify_make_v4
+      - name: Render V4 video
+        id: render
+        if: ${{ inputs.operation == 'render' }}
+        env:
+          REQUEST_ID: ${{ steps.request.outputs.request_id }}
+          CATEGORY: ${{ env.CATEGORY }}
+          DURATION_SECONDS: ${{ env.DURATION_SECONDS }}
+          PIPER_VOICE: ${{ env.PIPER_VOICE }}
+          VOICE_RATE: ${{ env.VOICE_RATE }}
+          PITCH_SEMITONES: ${{ env.PITCH_SEMITONES }}
+          VOICE_VOLUME: ${{ env.VOICE_VOLUME }}
+          PAUSE_SECONDS: ${{ env.PAUSE_SECONDS }}
+          NARRATION_INTENSITY: ${{ env.NARRATION_INTENSITY }}
+          VOICE_AUDITIONS: ${{ env.VOICE_AUDITIONS }}
+          MAKE_RESULT_WEBHOOK_URL: ${{ secrets.MAKE_RESULT_WEBHOOK_URL }}
+          MAKE_WEBHOOK_API_KEY: ${{ secrets.MAKE_WEBHOOK_API_KEY }}
+          ARTIFACT_NAME: nexus-v4-${{ steps.request.outputs.request_id }}
+          GITHUB_RUN_ID: ${{ github.run_id }}
+          GITHUB_SERVER_URL: ${{ github.server_url }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+        run: |
+          python -m py_compile nexus_video/story_v4.py nexus_video/engine_v4.py nexus_video/drive_v4.py nexus_video/notify_make_v4.py tests/test_story_v4.py tests/test_engine_v4.py
+          python -m unittest discover -s tests -v
+          python -m nexus_video.engine_v4
+      - name: Verify rendered MP4 and audio deliverables
+        if: ${{ inputs.operation == 'render' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          output_dir="output/$REQUEST_ID"
+          mp4="$(find "$output_dir/videos" -maxdepth 1 -type f -name '*.mp4' -print -quit)"
+          test -n "$mp4" && test -s "$mp4"
+          test -s "$output_dir/audios/narration.wav"
+          test -s "$output_dir/audios/music.wav"
+          test -s "$output_dir/audios/effects.wav"
+          test -s "$output_dir/audios/audio_mix.wav"
+          python - "$mp4" <<'PY'
+          import json, subprocess, sys
+          probe = json.loads(subprocess.check_output([
+              "ffprobe", "-v", "error", "-show_streams", "-show_format", "-of", "json", sys.argv[1]
+          ], text=True))
+          streams = probe["streams"]
+          video = next((s for s in streams if s.get("codec_type") == "video"), None)
+          audio = next((s for s in streams if s.get("codec_type") == "audio"), None)
+          assert video and video.get("codec_name") == "h264", "MP4 lacks H.264 video"
+          assert (video.get("width"), video.get("height")) == (1080, 1920), "Unexpected video dimensions"
+          assert video.get("r_frame_rate") == "30/1", "Video is not 30 fps"
+          assert audio and audio.get("codec_name") == "aac", "MP4 lacks AAC audio"
+          duration = float(probe["format"]["duration"])
+          assert 30 <= duration <= 60, f"Unexpected duration: {duration}"
+          print(f"DELIVERABLES_OK mp4={sys.argv[1]} duration={duration:.2f}s")
+          PY
+      - name: Download a previous artifact for Drive-only retry
+        if: ${{ inputs.operation == 'upload_only' }}
+        uses: actions/download-artifact@v4
+        with:
+          name: nexus-v4-${{ steps.request.outputs.request_id }}
+          path: output/${{ steps.request.outputs.request_id }}/
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          repository: ${{ github.repository }}
+          run-id: ${{ inputs.source_run_id }}
+      - name: Preserve output as GitHub artifact before Drive upload
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: nexus-v4-${{ steps.request.outputs.request_id }}
+          path: output/${{ steps.request.outputs.request_id }}/
+          if-no-files-found: warn
+          retention-days: 14
+      - name: Notify Make that Drive upload started
+        if: ${{ (inputs.operation == 'render' && steps.render.outcome == 'success') || inputs.operation == 'upload_only' }}
+        continue-on-error: true
+        env:
+          NEXUS_STATUS: uploading_drive
+          REQUEST_ID: ${{ steps.request.outputs.request_id }}
+          ARTIFACT_NAME: nexus-v4-${{ steps.request.outputs.request_id }}
+          MAKE_RESULT_WEBHOOK_URL: ${{ secrets.MAKE_RESULT_WEBHOOK_URL }}
+          MAKE_WEBHOOK_API_KEY: ${{ secrets.MAKE_WEBHOOK_API_KEY }}
+          GITHUB_RUN_ID: ${{ github.run_id }}
+          GITHUB_SERVER_URL: ${{ github.server_url }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+        run: python -m nexus_video.notify_make_v4
+      - name: Upload and verify all files in Google Drive
+        id: drive
+        if: ${{ ((inputs.operation == 'render' && steps.render.outcome == 'success') || inputs.operation == 'upload_only') && env.DRIVE_CONFIGURED == 'true' }}
+        env:
+          REQUEST_ID: ${{ steps.request.outputs.request_id }}
+          GOOGLE_OAUTH_CLIENT_JSON: ${{ secrets.GOOGLE_OAUTH_CLIENT_JSON }}
+          GOOGLE_OAUTH_REFRESH_TOKEN: ${{ secrets.GOOGLE_OAUTH_REFRESH_TOKEN }}
+          GOOGLE_DRIVE_ROOT_NAME: NEXUS VIDEO AI
+        run: |
+          mkdir -p "output/$REQUEST_ID/errors"
+          set -o pipefail
+          python -m nexus_video.drive_v4 2>&1 | tee "output/$REQUEST_ID/errors/drive_upload.log"
+      - name: Preserve Drive failure log in GitHub artifact
+        if: ${{ failure() && steps.drive.outcome == 'failure' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: nexus-v4-${{ steps.request.outputs.request_id }}
+          path: output/${{ steps.request.outputs.request_id }}/
+          if-no-files-found: warn
+          retention-days: 14
+          overwrite: true
+      - name: Send final status to Make
+        if: ${{ always() }}
+        env:
+          NEXUS_STATUS: ${{ steps.drive.outcome == 'success' && 'completed' || steps.drive.outcome == 'failure' && 'drive_upload_failed' || (inputs.operation == 'render' && steps.render.outcome == 'success' && 'rendered') || (inputs.operation == 'render' && steps.render.outcome == 'failure' && 'render_failed') || 'error' }}
+          REQUEST_ID: ${{ steps.request.outputs.request_id }}
+          ARTIFACT_NAME: nexus-v4-${{ steps.request.outputs.request_id }}
+          MAKE_RESULT_WEBHOOK_URL: ${{ secrets.MAKE_RESULT_WEBHOOK_URL }}
+          MAKE_WEBHOOK_API_KEY: ${{ secrets.MAKE_WEBHOOK_API_KEY }}
+          GITHUB_RUN_ID: ${{ github.run_id }}
+          GITHUB_SERVER_URL: ${{ github.server_url }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+        run: python -m nexus_video.notify_make_v4
