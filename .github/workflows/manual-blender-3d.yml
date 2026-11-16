@@ -76,7 +76,7 @@ jobs:
         env:
           NEXUS_INSTALL_SECONDS: ${{ steps.install.outputs.seconds }}
         run: |
-          .venv/bin/python tools/render_3d_prototype.py --out artifacts/blender3d --samples "${{ inputs.samples }}"
+          .venv/bin/python tools/render_3d_prototype.py --out artifacts/blender3d --samples "${{ inputs.samples || '8' }}"
       - name: Validate MP4 and visible motion
         run: |
           .venv/bin/python tools/validate_3d_prototype.py artifacts/blender3d
