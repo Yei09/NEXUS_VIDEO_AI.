@@ -24,7 +24,9 @@ class CinematicDepthV421Tests(unittest.TestCase):
         far = SceneLayer("far", sprite, .2, x=80, camera_weight=1)
         a = compose_scene_layers(self.base, [near], camera_target=(20, 0))
         b = compose_scene_layers(self.base, [far], camera_target=(20, 0))
-        self.assertGreater(ImageChops.difference(a, b).getbbox()[0], -1)
+        bounds = ImageChops.difference(a, b).getbbox()
+        self.assertIsNotNone(bounds)
+        self.assertGreater(bounds[2] - bounds[0], 0)
 
     def test_door_leaf_is_an_independent_animated_layer(self):
         event = {"action": "door_open", "camera": "locked_reveal"}
