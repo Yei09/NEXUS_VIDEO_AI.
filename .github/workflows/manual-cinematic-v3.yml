@@ -39,7 +39,7 @@ jobs:
         run: python -m py_compile nexus_video/engine_v3.py
       - name: Render one narrative short film and voice auditions
         env:
-          PIPER_VOICE: \${{ inputs.voice }}
+          PIPER_VOICE: ${{ inputs.voice }}
         run: python -m nexus_video.engine_v3
       - name: Validate scene diversity and motion frames
         run: |
