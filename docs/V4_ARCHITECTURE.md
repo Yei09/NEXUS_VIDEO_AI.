@@ -105,7 +105,7 @@ Campos adicionales: stage, run_id, run_url, artifact_name, drive_links, error_me
 
 ## Límite de activación de GitHub
 
-GitHub documenta que un workflow workflow_dispatch solo puede recibir eventos si el archivo del workflow ya existe en la rama predeterminada. Por tanto, mientras nexus-video-v4.yml exista solo en v4-make-drive, Make no puede despacharlo mediante la API. Para activar el circuito Make → GitHub será necesario aprobar y fusionar el workflow a main (o cambiar temporalmente la rama predeterminada, acción que no se hará sin autorización). Esta rama puede revisarse y prepararse sin modificar main.
+GitHub documenta que un workflow workflow_dispatch solo puede recibir eventos si el archivo del workflow ya existe en la rama predeterminada. Por tanto, mientras nexus-video-v4.yml exista solo en v4-make-drive, Make no puede despacharlo mediante la API. Para activar el circuito Make → GitHub será necesario aprobar y fusionar el PR #2 (v4-workflow-bootstrap), que agrega únicamente el archivo del workflow a main. El motor permanece en v4-make-drive y el workflow está protegido para ejecutarse solo con ese ref. El PR #1 revisa el código V4 sobre cinematic-v3 y no se fusiona a main. Ningún PR se fusionará sin autorización. Esta separación evita llevar todos los cambios V3/V4 a main de una sola vez.
 
 ## Archivos de salida por solicitud
 
