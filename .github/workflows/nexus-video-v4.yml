@@ -223,7 +223,7 @@ jobs:
           retention-days: 14
           overwrite: true
       - name: Send final status to Make
-        if: ${{ always() && secrets.MAKE_RESULT_WEBHOOK_URL != '' && secrets.MAKE_WEBHOOK_API_KEY != '' }}
+        if: ${{ always() }}
         env:
           NEXUS_STATUS: ${{ steps.drive.outcome == 'success' && 'completed' || steps.drive.outcome == 'failure' && 'drive_upload_failed' || 'error' }}
           REQUEST_ID: ${{ steps.request.outputs.request_id }}
