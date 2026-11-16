@@ -1,20 +1,31 @@
 # NEXUS VIDEO AI
 
-Cloud-first, private-by-default short-video generator. It creates original Spanish scripts, synthesizes narration with Piper TTS, renders vertical MP4 with FFmpeg, validates output, and can upload to Google Drive. It never publishes to social networks.
+Generador cloud de **historias originales de terror en español** para vídeos verticales cortos. Incluye terror psicológico, paranormal, leyendas urbanas, casas embrujadas, criaturas y sucesos inexplicables.
 
-## Safety defaults
+## Flujo de creación
 
-- Manual `workflow_dispatch` only. No scheduled workflow is enabled.
-- No paid services or billing setup is required by this repository.
-- Google Drive upload is skipped unless the owner configures the Google OAuth client JSON, refresh token and destination folder ID as GitHub Actions secrets/variables.
-- Make.com is an optional metadata-only coordinator; MP4 files are never sent through Make.
-- No social publishing integrations exist.
+1. Selecciona una categoría de terror.
+2. El motor crea un relato breve original con gancho inicial y giro final.
+3. Piper TTS genera la narración en español.
+4. Python/Pillow crea escenas ilustradas originales localmente (sin bancos de imágenes ni API de pago).
+5. FFmpeg monta las escenas, subtítulos sincronizados, voz y ambiente de terror sintetizado.
+6. Valida MP4 H.264/AAC, 1080×1920 y duración de 25–60 segundos.
+7. Puede guardar el MP4 en Google Drive cuando se configuren credenciales OAuth.
 
-## First manual test
+## Seguridad y límites
 
-1. Configure the Piper model secrets/variables described in `docs/SETUP.md`.
-2. Optionally configure Drive credentials (no credentials are committed).
-3. Open **Actions → NEXUS Video - Manual Test → Run workflow**.
-4. Download the generated MP4 artifact. If Drive credentials are configured, the workflow also verifies the uploaded file metadata.
+- Solo ejecución manual con workflow_dispatch. No hay programación diaria.
+- Una ejecución crea exactamente una historia.
+- No se publica en TikTok, Instagram, YouTube ni ninguna red.
+- No se integra ningún servicio de pago ni se habilita facturación.
+- Drive es opcional y se omite sin credenciales válidas.
+- Make recibe metadatos solamente; nunca recibe el vídeo.
+- El panel web es una maqueta de control; no tiene aún backend conectado.
 
-See `docs/SETUP.md` for exact setup. The first commit intentionally leaves daily schedules disabled.
+## Prueba manual
+
+Abre Actions → **NEXUS Video - Manual Horror Test** → Run workflow y elige una categoría. Descarga el artefacto `nexus-horror-story-test`. Para Drive, sigue `docs/SETUP.md`.
+
+## Importante
+
+Las escenas de prueba son ilustraciones procedurales generadas por código y el ambiente sonoro se sintetiza en FFmpeg. No son todavía imágenes cinematográficas generadas por un modelo de imagen ni efectos Foley grabados. La voz y el render necesitan una ejecución real de Actions antes de considerarse verificados.
