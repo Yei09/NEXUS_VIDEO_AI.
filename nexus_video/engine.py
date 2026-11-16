@@ -10,7 +10,7 @@ DEMO=("¿Sabías que tu cerebro sigue trabajando mientras duermes? Durante el su
 
 def run(cmd, input_text=None):
     p=subprocess.run(cmd,input=input_text,text=True,capture_output=True)
-    if p.returncode: raise RuntimeError(f"Fallo: {' '.join(cmd)}\\n{p.stderr[-2500:]}")
+    if p.returncode: raise RuntimeError(f"Fallo: {' '.join(cmd)}\n{p.stderr[-2500:]}")
     return p.stdout.strip()
 
 def duration(p):
@@ -57,7 +57,7 @@ def main():
         return f"{h:02}:{m:02}:{s:02},{ms:03}"
     srt=WORK/"captions.srt"; step=seconds/len(chunks)
     with srt.open("w",encoding="utf-8") as f:
-        for i,c in enumerate(chunks): f.write(f"{i+1}\\n{ts(i*step)} --> {ts(min(seconds,(i+1)*step))}\\n{c}\\n\\n")
+        for i,c in enumerate(chunks): f.write(f"{i+1}\n{ts(i*step)} --> {ts(min(seconds,(i+1)*step))}\n{c}\n\n")
     stamp=datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ"); mp4=OUT/f"nexus-video-{stamp}.mp4"
     vf="scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,subtitles=work/captions.srt:force_style='FontName=DejaVu Sans,FontSize=19,PrimaryColour=&H00FFFFFF,OutlineColour=&H80000000,BorderStyle=1,Outline=2,Shadow=1,Alignment=2,MarginV=170'"
     run(["ffmpeg","-y","-loop","1","-i",str(bg),"-i",str(wav),"-vf",vf,"-c:v","libx264","-preset","veryfast","-tune","stillimage","-pix_fmt","yuv420p","-r","30","-c:a","aac","-b:a","160k","-shortest","-movflags","+faststart",str(mp4)])
