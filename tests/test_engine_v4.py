@@ -69,7 +69,25 @@ class EngineV4VisualTests(unittest.TestCase):
             1.25,
             "A floor-cable regeneration must alter visible composition, not only metadata",
         )
+ 
+    def test_duration_allocator_hits_requested_total(self):
+        from nexus_video.engine_v4 import allocate_pause_durations
+        speech = [5.0, 4.0, 6.0, 5.0, 4.0, 6.0]
+        pauses = allocate_pause_durations(speech, 45.0, 0.78, "mysterious")
+        self.assertEqual(len(pauses), 5)
+        self.assertAlmostEqual(sum(speech) + sum(pauses), 45.0, places=9)
+        self.assertTrue(all(p >= 0.2 for p in pauses))
 
+    def test_duration_allocator_rejects_target_shorter_than_speech(self):
+        from nexus_video.engine_v4 import allocate_pause_durations
+        with self.assertRaises(ValueError):
+            allocate_pause_durations([8, 8, 8, 8, 8, 8], 45.0, 0.78, "mysterious")
+
+    def test_urgent_pacing_fills_requested_duration(self):
+        from nexus_video.engine_v4 import allocate_pause_durations
+        speech = [5.0] * 6
+        pauses = allocate_pause_durations(speech, 45.0, 0.78, "urgent")
+        self.assertAlmostEqual(sum(speech) + sum(pauses), 45.0, places=9)
 
 if __name__ == "__main__":
     unittest.main()
