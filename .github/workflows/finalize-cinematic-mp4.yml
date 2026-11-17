@@ -28,6 +28,9 @@ jobs:
         with:
           ref: cinematic-reconstruction
 
+      - name: Validate consolidation script syntax
+        run: python -m py_compile tools/consolidate_cinematic_artifact.py
+
       - name: Install FFmpeg and image validation dependency
         shell: bash
         run: |
