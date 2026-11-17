@@ -1,0 +1,51 @@
+name: NEXUS cinematic final MP4 consolidation
+
+on:
+  workflow_dispatch:
+    inputs:
+      source_run_id:
+        description: Optional successful render run ID (leave empty to find the newest complete artifact)
+        required: false
+        default: ""
+
+permissions:
+  actions: read
+  contents: read
+
+jobs:
+  consolidate:
+    if: ${{ github.ref == 'refs/heads/cinematic-reconstruction' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout cinematic reconstruction branch only
+        uses: actions/checkout@v4
+        with:
+          ref: cinematic-reconstruction
+
+      - name: Install FFmpeg and image validation dependency
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg
+          python -m pip install --disable-pip-version-check opencv-python-headless
+
+      - name: Consolidate verified frames from one complete prior artifact
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          SOURCE_RUN_ID: ${{ inputs.source_run_id }}
+          OUTPUT_DIR: delivery
+        run: python tools/consolidate_cinematic_artifact.py
+
+      - name: Upload only the final MP4, validation report and six compressed frames
+        uses: actions/upload-artifact@v4
+        with:
+          name: NEXUS-CINEMATIC-FINAL
+          path: |
+            delivery/NEXUS_CINEMATIC_FINAL.mp4
+            delivery/validation_report.json
+            delivery/representative_frames/*.jpg
+          if-no-files-found: error
+          retention-days: 14
