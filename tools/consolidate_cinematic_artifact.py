@@ -23,8 +23,8 @@ OUTPUT = Path(os.environ.get("OUTPUT_DIR", "delivery")).resolve()
 RUN_OVERRIDE = os.environ.get("SOURCE_RUN_ID", "").strip()
 FRAME_RE = re.compile(r"(?:^|/)frames/frame_(\d{4})\.png$")
 REPRESENTATIVE = (16, 66, 126, 166, 226, 286)
-MIN_OUTPUT_RESERVE = 256 * 1024 * 1024
-EXTRACTION_RESERVE = 1500 * 1024 * 1024
+MIN_OUTPUT_RESERVE = 512 * 1024 * 1024
+PREFLIGHT_MULTIPLIER = 3
 
 
 def request_json(url):
@@ -120,6 +120,17 @@ def extract_and_check(archive_path, temp_root):
 
     with zipfile.ZipFile(archive_path, "r") as archive:
         names = archive.namelist()
+        uncompressed_bytes = sum(item.file_size for item in archive.infolist() if not item.is_dir())
+        free_during_extract = shutil.disk_usage(temp_root).free
+        extraction_required = uncompressed_bytes + MIN_OUTPUT_RESERVE
+        if free_during_extract < extraction_required:
+            raise RuntimeError(
+                "Espacio insuficiente para extraer el ZIP: "
+                f"disponible={free_during_extract} bytes; requerido={extraction_required} bytes; "
+                f"faltan={extraction_required - free_during_extract} bytes. "
+                "Se conserva el ZIP temporal y no se inicia la extracción."
+            )
+        print(json.dumps({"event":"zip_expansion_preflight_pass","uncompressed_bytes":uncompressed_bytes,"free_bytes":free_during_extract,"required_bytes":extraction_required}),flush=True)
         frame_members = {}
         for name in names:
             match = FRAME_RE.search(name)
@@ -198,7 +209,7 @@ def extract_and_check(archive_path, temp_root):
     return state, performance, prior_validation, frame_hashes, audio_path, frames_dir
 
 
-def run_ffmpeg(frames_dir, audio_path, output):
+def run_ffmpeg(frames_dir, audio_path, output, crf, preset):
     command = [
         "ffmpeg", "-y", "-hide_banner", "-loglevel", "error",
         "-framerate", "30", "-start_number", "1",
@@ -211,8 +222,26 @@ def run_ffmpeg(frames_dir, audio_path, output):
         "-r", "30", "-c:a", "aac", "-b:a", "160k",
         "-movflags", "+faststart", str(output),
     ]
-    print("Ejecutando FFmpeg para ensamblar los 300 PNG y el audio master.", flush=True)
+    print(f"Ejecutando FFmpeg: libx264 CRF {crf}, preset {preset}.", flush=True)
+    started = time.perf_counter()
     subprocess.run(command, check=True)
+    return time.perf_counter() - started
+
+
+def measure_ssim(frames_dir, encoded_video, stats_path):
+    command = [
+        "ffmpeg", "-hide_banner", "-i", str(encoded_video),
+        "-framerate", "30", "-start_number", "1",
+        "-i", str(frames_dir / "frame_%04d.png"),
+        "-filter_complex",
+        f"[1:v]format=yuv420p[ref];[0:v]format=yuv420p[dist];[ref][dist]ssim=stats_file={stats_path}",
+        "-f", "null", "-"
+    ]
+    result = subprocess.run(command, check=True, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+    match = re.search(r"All:([0-9.]+)", result.stdout)
+    if not match:
+        raise RuntimeError(f"FFmpeg no devolvió SSIM para {encoded_video.name}")
+    return float(match.group(1))
 
 
 def validate_mp4(path):
@@ -266,16 +295,10 @@ def make_representative_jpegs(frames_dir, destination):
 
 def main():
     OUTPUT.mkdir(parents=True, exist_ok=True)
-    for child in OUTPUT.iterdir():
-        if child.is_dir():
-            shutil.rmtree(child)
-        else:
-            child.unlink()
-
     run_id, artifact = locate_source_artifact()
     free = shutil.disk_usage(Path.cwd()).free
     archive_bytes = int(artifact["size_in_bytes"])
-    required = archive_bytes + EXTRACTION_RESERVE + MIN_OUTPUT_RESERVE
+    required = archive_bytes * PREFLIGHT_MULTIPLIER + MIN_OUTPUT_RESERVE
     if free < required:
         missing = required - free
         raise RuntimeError(
@@ -287,7 +310,7 @@ def main():
         "event": "disk_preflight_pass",
         "free_bytes": free,
         "archive_bytes": archive_bytes,
-        "extraction_reserve_bytes": EXTRACTION_RESERVE,
+        "preflight_multiplier": PREFLIGHT_MULTIPLIER,
         "output_reserve_bytes": MIN_OUTPUT_RESERVE,
         "required_bytes": required,
     }), flush=True)
@@ -301,8 +324,22 @@ def main():
         )
         zip_path.unlink()
         final_video = OUTPUT / "NEXUS_CINEMATIC_FINAL.mp4"
-        run_ffmpeg(frames, audio, final_video)
+        # Compare the existing production settings with the requested higher-quality encode.
+        baseline = temp_root / "benchmark_crf22_veryfast.mp4"
+        candidate = temp_root / "benchmark_crf21_slow.mp4"
+        baseline_seconds = run_ffmpeg(frames, audio, baseline, 22, "veryfast")
+        candidate_seconds = run_ffmpeg(frames, audio, candidate, 21, "slow")
+        baseline_probe, baseline_checks = validate_mp4(baseline)
+        candidate_probe, candidate_checks = validate_mp4(candidate)
+        baseline_ssim = measure_ssim(frames, baseline, temp_root / "baseline_ssim.log")
+        candidate_ssim = measure_ssim(frames, candidate, temp_root / "candidate_ssim.log")
+        if not all(baseline_checks.values()) or not all(candidate_checks.values()):
+            raise RuntimeError("Una de las codificaciones de comparación no pasó FFprobe.")
+        # CRF 21 slow is the requested candidate; promote only after validation.
+        shutil.copy2(candidate, final_video)
         probe, checks = validate_mp4(final_video)
+        if not all(checks.values()):
+            raise RuntimeError("El MP4 final no pasó FFprobe después de copiar el candidato.")
         representative = make_representative_jpegs(frames, OUTPUT / "representative_frames")
         report = {
             "status": "PASS",
@@ -328,10 +365,31 @@ def main():
                 "sha256": hashlib.sha256(final_video.read_bytes()).hexdigest(),
                 "ffprobe": probe,
                 "checks": checks,
+                "encoding_comparison": {
+                    "baseline": {
+                        "settings": {"codec": "libx264", "crf": 22, "preset": "veryfast"},
+                        "bytes": baseline.stat().st_size,
+                        "encode_seconds": round(baseline_seconds, 3),
+                        "ssim_vs_lossless_png_frames": baseline_ssim,
+                        "ffprobe_checks": baseline_checks,
+                        "ffprobe": baseline_probe,
+                    },
+                    "candidate": {
+                        "settings": {"codec": "libx264", "crf": 21, "preset": "slow"},
+                        "bytes": candidate.stat().st_size,
+                        "encode_seconds": round(candidate_seconds, 3),
+                        "ssim_vs_lossless_png_frames": candidate_ssim,
+                        "ffprobe_checks": candidate_checks,
+                        "ffprobe": candidate_probe,
+                    },
+                    "size_change_percent": round((candidate.stat().st_size / baseline.stat().st_size - 1) * 100, 2),
+                    "encode_time_change_percent": round((candidate_seconds / baseline_seconds - 1) * 100, 2) if baseline_seconds else None,
+                    "ssim_change": round(candidate_ssim - baseline_ssim, 6),
+                },
             },
             "representative_frames": representative,
             "cleanup": {
-                "source_zip_deleted_before_encoding": True,
+                "source_zip_deleted_before_encoding": True,\n                "benchmark_encodes_removed_after_comparison": True,
                 "temporary_frame_and_audio_directory_removed": True,
                 "only_final_video_report_and_six_jpegs_are_uploaded": True,
             },
@@ -345,7 +403,7 @@ def main():
         "status": "PASS",
         "video": str(OUTPUT / "NEXUS_CINEMATIC_FINAL.mp4"),
         "ffprobe": report["video"]["ffprobe"],
-        "uploaded_files": 8,
+        "uploaded_files": 8,\n        "encoding": "libx264 CRF 21 preset slow, AAC 160 kbps",
     }, indent=2), flush=True)
 
 
