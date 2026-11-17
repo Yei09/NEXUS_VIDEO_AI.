@@ -51,7 +51,7 @@ def locate_source_artifact():
             and run.get("status") == "completed"
             and run.get("conclusion") == "success"
         ]
-        runs.sort(key=lambda x: x.get("run_number", 0), reverse=True)
+        runs.sort(key=lambda x: x.get("created_at", ""), reverse=True)
         run_ids = [run["id"] for run in runs]
 
     for run_id in run_ids:
