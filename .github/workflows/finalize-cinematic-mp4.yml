@@ -12,6 +12,11 @@ permissions:
   actions: read
   contents: read
 
+# Only one consolidation can run at a time for this branch.
+concurrency:
+  group: nexus-final-mp4-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
   consolidate:
     if: ${{ github.ref == 'refs/heads/cinematic-reconstruction' }}
