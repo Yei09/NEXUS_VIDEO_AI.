@@ -389,7 +389,8 @@ def main():
             },
             "representative_frames": representative,
             "cleanup": {
-                "source_zip_deleted_before_encoding": True,\n                "benchmark_encodes_removed_after_comparison": True,
+                "source_zip_deleted_before_encoding": True,
+                "benchmark_encodes_removed_after_comparison": True,
                 "temporary_frame_and_audio_directory_removed": True,
                 "only_final_video_report_and_six_jpegs_are_uploaded": True,
             },
