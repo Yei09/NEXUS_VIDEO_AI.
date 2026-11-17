@@ -3,6 +3,10 @@ on:
   pull_request:
     branches: [cinematic-v3]
     types: [synchronize]
+    paths:
+      - 'nexus_video3d/**'
+      - 'tools/render_3d_resumable.py'
+      - 'tools/validate_3d_prototype.py'
   workflow_dispatch:
     inputs:
       samples:
