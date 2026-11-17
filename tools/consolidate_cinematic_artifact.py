@@ -218,7 +218,7 @@ def run_ffmpeg(frames_dir, audio_path, output, crf, preset):
         "-map", "0:v:0", "-map", "1:a:0",
         "-frames:v", "300", "-t", "10",
         "-vf", "format=yuv420p",
-        "-c:v", "libx264", "-preset", "veryfast", "-crf", "22",
+        "-c:v", "libx264", "-preset", preset, "-crf", str(crf),
         "-r", "30", "-c:a", "aac", "-b:a", "160k",
         "-movflags", "+faststart", str(output),
     ]
