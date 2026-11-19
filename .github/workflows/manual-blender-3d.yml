@@ -1,0 +1,134 @@
+name: NEXUS Blender 3D prototype (recoverable block render)
+on:
+  workflow_dispatch:
+    inputs:
+      samples:
+        description: Cycles CPU samples (8 preserves current visual quality)
+        required: true
+        default: "8"
+      resume_run_id:
+        description: Optional previous Actions run ID to recover verified frames from
+        required: false
+        default: ""
+concurrency:
+  group: nexus-blender3d-${{ github.event.pull_request.head.ref || github.ref }}
+  cancel-in-progress: true
+jobs:
+  render:
+    if: ${{ github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && github.event.action == 'synchronize' && github.event.pull_request.number == 3 && github.event.pull_request.head.ref == 'cinematic-reconstruction' && github.event.pull_request.base.ref == 'cinematic-v3') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      - name: Verify event and exact source commit
+        shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          EVENT_ACTION: ${{ github.event.action }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_HEAD_REF: ${{ github.event.pull_request.head.ref }}
+          PR_BASE_REF: ${{ github.event.pull_request.base.ref }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          PR_HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
+          DISPATCH_REF: ${{ github.ref }}
+        run: |
+          set -euo pipefail
+          if [[ "$EVENT_NAME" == "pull_request" ]]; then
+            [[ "$EVENT_ACTION" == "synchronize" ]]
+            [[ "$PR_NUMBER" == "3" ]]
+            [[ "$PR_HEAD_REF" == "cinematic-reconstruction" ]]
+            [[ "$PR_BASE_REF" == "cinematic-v3" ]]
+            [[ "$PR_HEAD_REPO" == "$GITHUB_REPOSITORY" ]]
+            [[ "$PR_HEAD_SHA" =~ ^[0-9a-f]{40}$ ]]
+            echo "SOURCE_SHA=$PR_HEAD_SHA" >> "$GITHUB_ENV"
+            echo "PR_NUMBER=$PR_NUMBER" >> "$GITHUB_ENV"
+            echo "Validated PR #$PR_NUMBER head $PR_HEAD_SHA"
+          else
+            [[ "$DISPATCH_REF" == "refs/heads/cinematic-reconstruction" ]]
+            echo "SOURCE_SHA=$GITHUB_SHA" >> "$GITHUB_ENV"
+            echo "Validated manual branch $GITHUB_SHA"
+          fi
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Confirm checked-out commit
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual=$(git rev-parse HEAD)
+          [[ "$actual" == "$SOURCE_SHA" ]]
+          echo "CHECKED_OUT_SHA=$actual"
+          git status --short
+      - name: Find previous checkpoint run
+        id: resume
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CURRENT_RUN_ID: ${{ github.run_id }}
+          RESUME_INPUT: ${{ inputs.resume_run_id || '' }}
+        run: |
+          set -euo pipefail
+          previous="$RESUME_INPUT"
+          if [[ -z "$previous" ]]; then
+            previous=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs?per_page=50" --jq "[.workflow_runs[] | select(.id != $CURRENT_RUN_ID and .head_branch == \"cinematic-reconstruction\" and .status == \"completed\")][0].id // empty")
+          fi
+          if [[ -z "$previous" ]]; then
+            previous="43919809063"
+          fi
+          echo "run_id=$previous" >> "$GITHUB_OUTPUT"
+          echo "Checkpoint source run: $previous"
+      - name: Download previous frame checkpoint artifact
+        id: restore
+        continue-on-error: true
+        uses: actions/download-artifact@v4
+        with:
+          pattern: nexus-blender3d-*
+          merge-multiple: true
+          run-id: ${{ steps.resume.outputs.run_id }}
+          github-token: ${{ github.token }}
+          path: artifacts/resume
+      - name: Install Blender, FFmpeg and speech tools
+        id: install
+        shell: bash
+        run: |
+          set -euo pipefail
+          start=$(date +%s)
+          sudo apt-get update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y blender ffmpeg espeak-ng
+          end=$(date +%s)
+          echo "seconds=$((end-start))" >> "$GITHUB_OUTPUT"
+          blender --version | head -n 2
+          ffmpeg -version | head -n 1
+      - name: Install Python validation dependencies
+        run: |
+          python -m venv .venv
+          .venv/bin/pip install numpy opencv-python-headless
+      - name: Record memory before render
+        run: |
+          mkdir -p artifacts/blender3d
+          free -h > artifacts/blender3d/memory_before.txt
+      - name: Render verified 30-frame blocks and resume missing frames
+        env:
+          NEXUS_INSTALL_SECONDS: ${{ steps.install.outputs.seconds }}
+        run: |
+          .venv/bin/python tools/render_3d_resumable.py \
+            --out artifacts/blender3d \
+            --samples "${{ inputs.samples || '8' }}" \
+            --block-size 30 \
+            --resume artifacts/resume
+      - name: Validate complete MP4 and visible 3D motion
+        run: |
+          .venv/bin/python tools/validate_3d_prototype.py artifacts/blender3d
+          ffprobe -v error -show_streams -show_format artifacts/blender3d/nexus_blender3d_10s.mp4 > artifacts/blender3d/ffprobe_validation.json
+          free -h > artifacts/blender3d/memory_after.txt
+          du -ah artifacts/blender3d | sort -h > artifacts/blender3d/file_sizes.txt
+      - name: Upload render, checkpoints, logs and evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nexus-blender3d-recovery-${{ github.run_number }}
+          path: artifacts/blender3d/
+          if-no-files-found: warn
+          retention-days: 14

@@ -1,0 +1,247 @@
+name: NEXUS VIDEO AI V4 Production
+on:
+  workflow_dispatch:
+    inputs:
+      request_id:
+        description: UUID unique per request; leave empty only for a manual run
+        type: string
+        required: false
+        default: ""
+      category:
+        description: Story category
+        type: choice
+        required: true
+        default: paranormal
+        options:
+          - paranormal
+          - casa_embrujada
+          - leyenda_urbana
+          - criaturas
+          - psicologico
+      duration_seconds:
+        description: Target duration; output is validated within 30-60 seconds
+        type: number
+        required: true
+        default: 45
+      voice:
+        description: Piper voice model
+        type: choice
+        required: true
+        default: es_MX-claude-high
+        options:
+          - es_MX-claude-high
+          - es_MX-ald-medium
+          - es_ES-davefx-medium
+          - es_ES-sharvard-medium
+      voice_rate:
+        description: Narration rate multiplier (0.75-1.25)
+        type: string
+        required: true
+        default: "1.0"
+      pitch_semitones:
+        description: Pitch adjustment in semitones (-2 to 2)
+        type: string
+        required: true
+        default: "-1.0"
+      voice_volume:
+        description: Narration output volume (0.5-1.5)
+        type: string
+        required: true
+        default: "1.0"
+      pause_seconds:
+        description: Pause between story beats in seconds (0.2-1.5)
+        type: string
+        required: true
+        default: "0.78"
+      narration_intensity:
+        description: Narration and sound-design intensity
+        type: choice
+        required: true
+        default: mysterious
+        options:
+          - calm
+          - mysterious
+          - urgent
+      voice_auditions:
+        description: Generate four separate Piper voice audition WAVs
+        type: boolean
+        required: true
+        default: false
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: nexus-v4-${{ inputs.request_id || github.run_id }}
+  cancel-in-progress: false
+jobs:
+  production:
+    if: ${{ github.event_name == 'workflow_dispatch' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    env:
+      REQUEST_ID: ${{ inputs.request_id }}
+      CATEGORY: ${{ inputs.category }}
+      DURATION_SECONDS: ${{ inputs.duration_seconds }}
+      PIPER_VOICE: ${{ inputs.voice }}
+      VOICE_RATE: ${{ inputs.voice_rate }}
+      PITCH_SEMITONES: ${{ inputs.pitch_semitones }}
+      VOICE_VOLUME: ${{ inputs.voice_volume }}
+      PAUSE_SECONDS: ${{ inputs.pause_seconds }}
+      NARRATION_INTENSITY: ${{ inputs.narration_intensity }}
+      VOICE_AUDITIONS: ${{ inputs.voice_auditions }}
+    steps:
+      - name: Validate dispatch branch and print GitHub context
+        shell: bash
+        env:
+          EXPECTED_REF: refs/heads/v4.2.1-cinematic-depth
+        run: |
+          echo "github.event_name=$GITHUB_EVENT_NAME"
+          echo "github.ref=$GITHUB_REF"
+          echo "github.ref_name=$GITHUB_REF_NAME"
+          if [[ "$GITHUB_EVENT_NAME" != "workflow_dispatch" ]]; then
+            echo "::error::This workflow only accepts manual workflow_dispatch runs."
+            exit 1
+          fi
+          if [[ "$GITHUB_REF" != "$EXPECTED_REF" ]]; then
+            echo "::error title=Wrong branch::Select v4.2.1-cinematic-depth in the Run workflow branch selector. No production code was checked out."
+            exit 1
+          fi
+      - name: Checkout V4.2.1 branch
+        uses: actions/checkout@v4
+        with:
+          ref: v4.2.1-cinematic-depth
+      - name: Install FFmpeg and fonts
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg fonts-dejavu-core
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+      - name: Prepare request identity
+        id: request
+        run: |
+          python - <<'PY'
+          import os, uuid
+          value=os.getenv("REQUEST_ID","").strip() or str(uuid.uuid4())
+          parsed=str(uuid.UUID(value))
+          if parsed != value.lower():
+              raise SystemExit("request_id must be a canonical UUID")
+          with open(os.environ["GITHUB_ENV"],"a") as f:
+              f.write("REQUEST_ID="+parsed+"\n")
+              f.write("ARTIFACT_NAME=nexus-v4-"+parsed+"\n")
+          with open(os.environ["GITHUB_OUTPUT"],"a") as f:
+              f.write("request_id="+parsed+"\n")
+          print("request_id="+parsed)
+          PY
+      - name: Render V4.2.1 video
+        id: render
+        if: ${{ github.event_name == 'workflow_dispatch' }}
+        env:
+          REQUEST_ID: ${{ steps.request.outputs.request_id }}
+          CATEGORY: ${{ env.CATEGORY }}
+          DURATION_SECONDS: ${{ env.DURATION_SECONDS }}
+          PIPER_VOICE: ${{ env.PIPER_VOICE }}
+          VOICE_RATE: ${{ env.VOICE_RATE }}
+          PITCH_SEMITONES: ${{ env.PITCH_SEMITONES }}
+          VOICE_VOLUME: ${{ env.VOICE_VOLUME }}
+          PAUSE_SECONDS: ${{ env.PAUSE_SECONDS }}
+          NARRATION_INTENSITY: ${{ env.NARRATION_INTENSITY }}
+          VOICE_AUDITIONS: ${{ env.VOICE_AUDITIONS }}
+          ARTIFACT_NAME: nexus-v4-${{ steps.request.outputs.request_id }}
+          GITHUB_RUN_ID: ${{ github.run_id }}
+          GITHUB_SERVER_URL: ${{ github.server_url }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+        run: |
+          python -m py_compile nexus_video/story_v4.py nexus_video/engine_v4.py nexus_video/cinematic_v42.py nexus_video/cinematic_depth_v421.py tests/test_story_v4.py tests/test_engine_v4.py tests/test_cinematic_v42.py tests/test_cinematic_depth_v421.py tools/compare_v42_v421.py
+          python -m unittest discover -s tests -v 2>&1 | tee test-results.log
+          python -m nexus_video.engine_v4
+          mkdir -p output/$REQUEST_ID/reports
+          cp test-results.log output/$REQUEST_ID/reports/test-results.log
+      - name: Download protected V4.2 baseline artifact
+        if: ${{ github.event_name == 'workflow_dispatch' && steps.render.outcome == 'success' }}
+        uses: actions/download-artifact@v4
+        with:
+          name: nexus-v4-d8effcfb-cbdd-4e1f-ba08-d784bf1c681f
+          path: baseline-v4.2
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          repository: ${{ github.repository }}
+          run-id: 43821467642
+      - name: Compare six encoded scenes against V4.2
+        if: ${{ github.event_name == 'workflow_dispatch' && steps.render.outcome == 'success' }}
+        run: |
+          python tools/compare_v42_v421.py baseline-v4.2 output/$REQUEST_ID output/$REQUEST_ID/comparison
+          test -s output/$REQUEST_ID/comparison/comparison_report.json
+          test -s output/$REQUEST_ID/comparison/v4.2-vs-v4.2.1-contact-sheet.jpg
+      - name: Verify rendered V4.2.1 MP4 and audio deliverables
+        if: ${{ github.event_name == 'workflow_dispatch' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          output_dir="output/$REQUEST_ID"
+          mp4="$(find "$output_dir/videos" -maxdepth 1 -type f -name '*.mp4' -print -quit)"
+          test -n "$mp4" && test -s "$mp4"
+          test -s "$output_dir/audios/narration.wav"
+          test -s "$output_dir/audios/music.wav"
+          test -s "$output_dir/audios/effects.wav"
+          test -s "$output_dir/audios/audio_mix.wav"
+          test -s "$output_dir/reports/audio_sync_report.json"
+          test -s "$output_dir/frames/contact_sheet.jpg"
+          frame_count="$(find "$output_dir/frames" -maxdepth 1 -type f -name 'scene-*.jpg' | wc -l)"
+          test "$frame_count" -eq 6
+          python - "$mp4" "$output_dir/audios/narration.wav" "$output_dir/audios/audio_mix.wav" <<'PY'
+          import json, subprocess, sys, os
+          def media_duration(path):
+              data = json.loads(subprocess.check_output(["ffprobe", "-v", "error", "-show_format", "-of", "json", path], text=True))
+              return float(data["format"]["duration"])
+          probe = json.loads(subprocess.check_output([
+              "ffprobe", "-v", "error", "-show_streams", "-show_format", "-of", "json", sys.argv[1]
+          ], text=True))
+          streams = probe["streams"]
+          video = next((s for s in streams if s.get("codec_type") == "video"), None)
+          audio = next((s for s in streams if s.get("codec_type") == "audio"), None)
+          assert video and video.get("codec_name") == "h264", "MP4 lacks H.264 video"
+          assert (video.get("width"), video.get("height")) == (1080, 1920), "Unexpected video dimensions"
+          assert video.get("r_frame_rate") == "30/1", "Video is not 30 fps"
+          assert audio and audio.get("codec_name") == "aac", "MP4 lacks AAC audio"
+          duration = float(probe["format"]["duration"])
+          target = float(os.environ["DURATION_SECONDS"])
+          assert abs(duration-target) <= 0.15, f"MP4 duration {duration:.3f}s != target {target:.3f}s"
+          assert abs(media_duration(sys.argv[2])-target) <= 0.15, "Narration WAV duration mismatch"
+          assert abs(media_duration(sys.argv[3])-target) <= 0.15, "Audio mix WAV duration mismatch"
+          assert 30 <= duration <= 60, f"Unexpected duration: {duration}"
+          report=json.load(open(os.path.join(os.path.dirname(sys.argv[1]), "..", "reports", "render_report.json"), encoding="utf-8"))
+          motion=json.load(open(os.path.join(os.path.dirname(sys.argv[1]), "..", "reports", "motion_report.json"), encoding="utf-8"))
+          assert report.get("valid") is True, "render_report.json is not valid"
+          assert motion.get("motion_pass") is True, "Motion threshold failed"
+          assert motion.get("scene_diversity_pass") is True, "Scene diversity threshold failed"
+          assert motion.get("motion_threshold") == 1.25, "Motion threshold was changed"
+          assert motion.get("scene_diversity_threshold") == 7.0, "Diversity threshold was changed"
+          layers=motion.get("independent_layer_manifest", [])
+          assert len(layers) == 6, "Missing independent layer manifest for six scenes"
+          assert all(len(scene_layers) >= 2 for scene_layers in layers), "A scene lacks an action layer separate from its background plane"
+          metrics=motion.get("scene_metrics", [])
+          assert len(metrics) == 6, "Expected six scene motion records"
+          assert all(len(m.get("independent_layer_motion_samples", [])) == 3 for m in metrics), "Missing start/mid/end independent layer traces"
+          print(f"DELIVERABLES_OK mp4={sys.argv[1]} duration={duration:.3f}s target={target:.3f}s")
+          PY
+      - name: Preserve test evidence if rendering stops early
+        if: ${{ always() && hashFiles('test-results.log') != '' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: nexus-v4.2.1-test-evidence-${{ github.run_id }}
+          path: test-results.log
+          retention-days: 14
+      - name: Preserve V4.2.1 output as GitHub artifact
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: nexus-v4-${{ steps.request.outputs.request_id }}
+          path: output/${{ steps.request.outputs.request_id }}/
+          if-no-files-found: warn
+          retention-days: 14
