@@ -404,7 +404,8 @@ def main():
         "status": "PASS",
         "video": str(OUTPUT / "NEXUS_CINEMATIC_FINAL.mp4"),
         "ffprobe": report["video"]["ffprobe"],
-        "uploaded_files": 8,\n        "encoding": "libx264 CRF 21 preset slow, AAC 160 kbps",
+        "uploaded_files": 8,
+        "encoding": "libx264 CRF 21 preset slow, AAC 160 kbps",
     }, indent=2), flush=True)
 
 
