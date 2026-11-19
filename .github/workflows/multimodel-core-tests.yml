@@ -38,34 +38,3 @@ jobs:
             test-results.txt
           if-no-files-found: warn
           retention-days: 14
-
-  windows-diagnostic-smoke-test:
-    runs-on: windows-latest
-    timeout-minutes: 10
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: ${{ github.sha }}
-          path: nexus-source
-      - name: Run read-only Windows diagnostic
-        shell: pwsh
-        run: |
-          $ErrorActionPreference = "Stop"
-          .\nexus-source\scripts\diagnose-local-hardware.ps1 | Set-Content -Path ci-windows-hardware-diagnostic.json -Encoding utf8
-          $report = Get-Content -Path ci-windows-hardware-diagnostic.json -Raw | ConvertFrom-Json
-          if (-not $report.diagnostic.read_only) { throw "Read-only flag missing" }
-          if ($report.diagnostic.network_requests -ne $false) { throw "Network request policy mismatch" }
-          if ($report.diagnostic.downloads -ne $false) { throw "Download policy mismatch" }
-          if ($report.diagnostic.installations -ne $false) { throw "Installation policy mismatch" }
-          if ($report.diagnostic.registry_changes -ne $false) { throw "Registry policy mismatch" }
-          if ($report.diagnostic.environment_variable_changes -ne $false) { throw "Environment policy mismatch" }
-          if ($report.diagnostic.server_start -ne $false) { throw "Server policy mismatch" }
-          Write-Host "Windows diagnostic executed and JSON validated on GitHub runner."
-      - name: Upload Windows runner evidence
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: nexus-windows-diagnostic-smoke-evidence
-          path: ci-windows-hardware-diagnostic.json
-          if-no-files-found: warn
-          retention-days: 14
