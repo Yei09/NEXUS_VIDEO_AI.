@@ -1,15 +1,23 @@
 # Hardware and resource report
 
-This repository operation cannot inspect the user's personal development PC. No claim is made that the personal machine was benchmarked.
+## CI host measurement
+GitHub Actions run 44446326553 measured the hosted Linux runner:
+- OS/platform: Linux x86_64
+- Logical CPUs: 4
+- Total RAM: 15,701 MB
+- Disk: 144.35 GB total, 90.59 GB free
 
-Run on the target host:
+This is the temporary GitHub-hosted runner, **not the user's personal development computer**. It must not be used as the user's hardware profile.
+
+## Personal computer measurement
+This repository operation cannot inspect the user's personal PC. Run the following on the target host:
 python -m nexus_ai.cli hardware
 
-The command reports OS, architecture, logical CPU count, total RAM when Linux procfs is available, total disk and free disk. It labels the host measured. CI also records a GitHub runner snapshot; that is not the user's PC.
+The command reports OS, architecture, logical CPU count, total RAM when Linux procfs is available, total disk and free disk. It labels the host measured.
 
 For a real model benchmark, record peak resident memory, CPU utilization, latency, context length, quantization and model file size during a representative task.
 
-Initial conservative guidance:
+## Conservative model guidance
 - Qwen2.5-1.5B GGUF Q4_K_M is the first candidate only after checking disk/RAM; no download occurs automatically.
 - Qwen3-4B waits for a measured hardware report.
 - Qwen2.5-VL-3B GGUF has an 8 GB planning floor; do not install on low-memory hardware without measurement.
