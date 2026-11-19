@@ -1,11 +1,11 @@
 # Hardware and resource report
 
 ## CI host measurement
-Latest successful GitHub Actions run 44446367711 measured the hosted Linux runner:
+Latest successful GitHub Actions run 44446667716 measured the hosted Linux runner:
 - OS/platform: Linux x86_64
 - Logical CPUs: 4
 - Total RAM: 15,983 MB
-- Available RAM: recorded by the hardware probe
+- Available RAM at snapshot: 14,993 MB
 - Disk: 144.35 GB total, 87.19 GB free
 
 This is the temporary GitHub-hosted runner, **not the user's personal development computer**.
