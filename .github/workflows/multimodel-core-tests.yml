@@ -46,11 +46,12 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: ${{ github.sha }}
+          path: nexus-source
       - name: Run read-only Windows diagnostic
         shell: pwsh
         run: |
           $ErrorActionPreference = "Stop"
-          .\scripts\diagnose-local-hardware.ps1 | Set-Content -Path ci-windows-hardware-diagnostic.json -Encoding utf8
+          .\nexus-source\scripts\diagnose-local-hardware.ps1 | Set-Content -Path ci-windows-hardware-diagnostic.json -Encoding utf8
           $report = Get-Content -Path ci-windows-hardware-diagnostic.json -Raw | ConvertFrom-Json
           if (-not $report.diagnostic.read_only) { throw "Read-only flag missing" }
           if ($report.diagnostic.network_requests -ne $false) { throw "Network request policy mismatch" }
