@@ -3,8 +3,8 @@
 - Branch: cinematic-reconstruction
 - Starting HEAD checked before edits: 87125a96e96d1458120763c0bca3ecfe7cbdc7d5
 - Core implementation commit: 03d0114fc0beede22e6afc490541e4d71da298cd
-- Latest CI run: 44446326553 — success; tested implementation commit ce6fea5908a5f36cef45c7537042764c8c1e9fbe (same code tree; later commit only records CI evidence).
-- CI: compileall passed, model catalog JSON passed, 18 unit/contract tests passed in 1.571 seconds, hardware snapshot captured.
+- Latest CI run: 44446367711 — success; tested code commit e70109753e341b5c36a9f5a8d05c46b7e6972eaa (latest code; current HEAD adds documentation evidence only).
+- CI: compileall passed, model catalog JSON passed, 18 unit/contract tests passed in 1.544 seconds, hardware snapshot captured.
 - No model weights downloaded; no paid API, billing, subscription, Make, Google Drive or hosted inference activated.
 - No recurring workflow enabled; no PR merged.
 
