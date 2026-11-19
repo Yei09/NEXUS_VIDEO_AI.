@@ -1,16 +1,16 @@
 # Hardware and resource report
 
 ## CI host measurement
-GitHub Actions run 44446326553 measured the hosted Linux runner:
+Latest GitHub Actions run 44446367711 measured the hosted Linux runner:
 - OS/platform: Linux x86_64
 - Logical CPUs: 4
-- Total RAM: 15,701 MB
-- Disk: 144.35 GB total, 90.59 GB free
+- Total RAM: 15,983 MB
+- Disk: 144.35 GB total, 87.19 GB free
 
 This is the temporary GitHub-hosted runner, **not the user's personal development computer**. It must not be used as the user's hardware profile.
 
 ## Personal computer measurement
-This repository operation cannot inspect the user's personal PC. Run the following on the target host:
+This repository operation cannot inspect the user's personal PC. Run on the target host:
 python -m nexus_ai.cli hardware
 
 The command reports OS, architecture, logical CPU count, total RAM when Linux procfs is available, total disk and free disk. It labels the host measured.
