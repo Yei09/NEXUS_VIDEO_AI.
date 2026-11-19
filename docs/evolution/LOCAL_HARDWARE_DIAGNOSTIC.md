@@ -147,7 +147,7 @@ Revisión estática del script:
 - Solo invoca los comandos locales de versión de Python, FFmpeg y Blender, si existen en PATH.
 - Las consultas de hardware usan CIM/WMI local.
 
-**Límite de evidencia:** el script se ha añadido al repositorio, pero no se ha ejecutado en el Lenovo del usuario. No existe todavía una lectura real de CPU, RAM libre, pagefile, GPU, unidades ni herramientas instaladas. La evidencia de ejecución debe ser el JSON generado localmente por el usuario. Una ejecución en GitHub Actions no sustituye esa medición.
+**Límite de evidencia:** el script se ha añadido al repositorio, pero no se ha ejecutado en el Lenovo del usuario. No existe todavía una lectura real de CPU, RAM libre, pagefile, GPU, unidades ni herramientas instaladas. La evidencia de ejecución debe ser el JSON generado localmente por el usuario. Una ejecución en GitHub Actions no sustituye esa medición. Se intentó añadir una prueba de ejecución en Windows Actions, pero el checkout falló antes de invocar el script porque el nombre del repositorio termina en punto y el runner construye una ruta Windows inválida. Se retiró ese job para no dejar CI permanentemente fallido; por tanto, la sintaxis PowerShell todavía debe validarse en el propio Windows del usuario.
 
 ## 7. Próximos pasos
 
