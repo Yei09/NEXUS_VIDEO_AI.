@@ -1,7 +1,8 @@
-import json, tempfile, unittest
+import json, tempfile, unittest, os
 from pathlib import Path
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from threading import Thread
+from unittest.mock import patch
 from nexus_ai.types import Task
 from nexus_ai.registry import ModelRegistry
 from nexus_ai.adapters.base import BaseAdapter, AdapterError
@@ -13,6 +14,8 @@ from nexus_ai.director import Director
 from nexus_ai.agents import Agent, AGENT_ROLES
 from nexus_ai.memory import EvolutionMemory
 from nexus_ai.evolution import EvolutionCycle
+from nexus_ai.hardware import snapshot
+from nexus_ai.runtime import build_router
 
 class FakeAdapter(BaseAdapter):
  provider_id="fake"; supported_modalities=("text",)
@@ -68,8 +71,7 @@ class CoreTests(unittest.TestCase):
   result=Director(registry,{model["id"]:FakeAdapter(model["id"])}).dispatch(Task("text","test"))
   self.assertTrue(result.ok); self.assertEqual(result.model_id,model["id"]); self.assertIn("selection_score",result.metadata)
  def test_director_falls_back_only_to_registered_healthy_adapter(self):
-  registry=ModelRegistry()
-  primary=registry.get("qwen3-4b"); primary["specialty"]=["text"]
+  registry=ModelRegistry(); primary=registry.get("qwen3-4b"); primary["specialty"]=["text"]
   backup=registry.get("qwen2.5-1.5b-instruct-gguf"); backup["specialty"]=["text"]
   result=Director(registry,{primary["id"]:FakeAdapter(primary["id"],True),backup["id"]:FakeAdapter(backup["id"])}).dispatch(Task("text","test"))
   self.assertTrue(result.ok); self.assertEqual(result.model_id,backup["id"])
@@ -96,6 +98,18 @@ class CoreTests(unittest.TestCase):
    self.assertEqual(state["status"],"INTERRUPTED"); self.assertIsNone(state["current_cycle"])
  def test_loopback_only_policy(self):
   with self.assertRaises(ValueError): LlamaCppAdapter("https://example.com","remote")
+ def test_hardware_snapshot_labels_scope_and_memory(self):
+  result=snapshot()
+  self.assertIn("cpu_count_logical",result); self.assertIn("ram_total_mb",result)
+  self.assertIn("ram_available_mb",result); self.assertIn("disk_free_gb",result)
+  self.assertIn("current execution host",result["measurement_scope"])
+ def test_runtime_defaults_to_local_zero_cost_and_safe_ram(self):
+  with tempfile.TemporaryDirectory() as d, patch.dict(os.environ,{},clear=True):
+   router=build_router(memory_root=d)
+   self.assertFalse(router.policy["allow_remote"]); self.assertFalse(router.policy["allow_paid"])
+   self.assertEqual(router.policy["max_cost_usd"],0.0)
+   self.assertGreaterEqual(router.policy["max_memory_mb"],0)
+   self.assertEqual(router.adapters,{})
  def test_llama_cpp_http_contract(self):
   server=HTTPServer(("127.0.0.1",0),Handler); thread=Thread(target=server.serve_forever,daemon=True); thread.start()
   try:
@@ -110,8 +124,7 @@ class CoreTests(unittest.TestCase):
     image=Path(d)/"sample.png"; image.write_bytes(b"test-image-payload")
     adapter=LlamaCppVisionAdapter(f"http://127.0.0.1:{server.server_port}","vision-unit-model")
     result=adapter.run(Task("vision","Describe frame",inputs={"image_path":str(image)}))
-    self.assertTrue(result.ok,result.error)
-    content=server.last_payload["messages"][0]["content"]
+    self.assertTrue(result.ok,result.error); content=server.last_payload["messages"][0]["content"]
     self.assertEqual(content[0]["text"],"Describe frame")
     self.assertTrue(content[1]["image_url"]["url"].startswith("data:image/png;base64,"))
   finally: server.shutdown(); thread.join(timeout=2); server.server_close()
